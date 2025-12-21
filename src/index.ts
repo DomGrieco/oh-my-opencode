@@ -20,6 +20,14 @@ import {
   createAgentUsageReminderHook,
   createNonInteractiveEnvHook,
   createInteractiveBashSessionHook,
+  createGovernancePathValidatorHook,
+  createGovernanceHistorianHook,
+  createGovernanceLinearInjectorHook,
+  createGovernanceDocsDelegationHook,
+  HookHealthManager,
+  createGitSafetyValidatorHook,
+  createSecurityScannerHook,
+  createConflictDetectorHook,
 } from "./hooks";
 import { createGoogleAntigravityAuthPlugin } from "./auth/antigravity";
 import {
@@ -44,11 +52,26 @@ import {
   getCurrentSessionTitle,
 } from "./features/claude-code-session-state";
 import { updateTerminalTitle } from "./features/terminal";
-import { builtinTools, createCallOmoAgent, createBackgroundTools, createLookAt, interactive_bash, getTmuxPath } from "./tools";
+import {
+  builtinTools,
+  createCallOmoAgent,
+  createBackgroundTools,
+  createLookAt,
+  interactive_bash,
+  getTmuxPath,
+  // Governance tools
+  createLinearBranchTool,
+  createLinearUpdateStatusTool,
+  createLinearCreateIssueTool,
+  createReadContextTool,
+  createSpecFolderTool,
+  updateWorkflowStateTool,
+} from "./tools";
 import { BackgroundManager } from "./features/background-agent";
 import { createBuiltinMcps } from "./mcp";
 import { OhMyOpenCodeConfigSchema, type OhMyOpenCodeConfig, type HookName } from "./config";
 import { log, deepMerge } from "./shared";
+import { MaxTurnsEnforcer } from "./features/orchestration";
 import * as fs from "fs";
 import * as path from "path";
 import * as os from "os";
@@ -182,6 +205,37 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
   const disabledHooks = new Set(pluginConfig.disabled_hooks ?? []);
   const isHookEnabled = (hookName: HookName) => !disabledHooks.has(hookName);
 
+  const hookHealthConfig = pluginConfig.governance?.hook_health;
+  const hookHealthManager = isHookEnabled("hook-health-manager")
+    ? HookHealthManager.getInstance({
+        circuitBreakerThreshold: hookHealthConfig?.circuit_breaker_threshold,
+        slowHookThresholdMs: hookHealthConfig?.slow_hook_threshold_ms,
+        metricsRetentionCount: hookHealthConfig?.metrics_retention_count,
+        enableMetrics: hookHealthConfig?.enable_metrics,
+        logWarnings: hookHealthConfig?.log_warnings,
+      })
+    : null;
+
+  async function safeHookCall<T>(
+    hookName: string,
+    fn: () => Promise<T> | T
+  ): Promise<T | undefined> {
+    if (!hookHealthManager) {
+      try {
+        return await fn();
+      } catch (err) {
+        log(`[Hook Error] ${hookName}:`, err);
+        return undefined;
+      }
+    }
+
+    const result = await hookHealthManager.executeWithHealth(hookName, fn);
+    if (result.skipped) {
+      log(`[Hook Skipped] ${hookName}: ${result.skipReason}`);
+    }
+    return result.result;
+  }
+
   const todoContinuationEnforcer = isHookEnabled("todo-continuation-enforcer")
     ? createTodoContinuationEnforcer(ctx)
     : null;
@@ -247,6 +301,47 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
     ? createInteractiveBashSessionHook(ctx)
     : null;
 
+  // Governance hooks
+  const governancePathValidator = isHookEnabled("governance-path-validator")
+    ? createGovernancePathValidatorHook(ctx, pluginConfig.governance?.path_validation)
+    : null;
+  const governanceHistorian = isHookEnabled("governance-historian")
+    ? createGovernanceHistorianHook(ctx, pluginConfig.governance?.historian)
+    : null;
+  const governanceLinearInjector = isHookEnabled("governance-linear-injector")
+    ? createGovernanceLinearInjectorHook(ctx, pluginConfig.governance?.linear)
+    : null;
+  const governanceDocsDelegation = isHookEnabled("governance-docs-delegation")
+    ? createGovernanceDocsDelegationHook(ctx, pluginConfig.governance?.docs_blocking)
+    : null;
+
+  // Safety hooks (LIF-63)
+  const gitSafetyValidator = isHookEnabled("git-safety-validator")
+    ? createGitSafetyValidatorHook(ctx, {
+        protectedBranches: pluginConfig.governance?.git_safety?.protected_branches,
+        blockForceOperations: pluginConfig.governance?.git_safety?.block_force_operations,
+        warnOnDestructive: pluginConfig.governance?.git_safety?.warn_on_destructive,
+        allowListPatterns: pluginConfig.governance?.git_safety?.allow_list_patterns,
+      })
+    : null;
+  const securityScanner = isHookEnabled("security-scanner")
+    ? createSecurityScannerHook(ctx, {
+        enabled: pluginConfig.governance?.security_scanner?.enabled,
+        scanOnWrite: pluginConfig.governance?.security_scanner?.scan_on_write,
+        scanOnEdit: pluginConfig.governance?.security_scanner?.scan_on_edit,
+        maskInOutput: pluginConfig.governance?.security_scanner?.mask_in_output,
+        allowListPatterns: pluginConfig.governance?.security_scanner?.allow_list_patterns,
+      })
+    : null;
+  const conflictDetector = isHookEnabled("conflict-detector")
+    ? createConflictDetectorHook(ctx, {
+        enabled: pluginConfig.governance?.conflict_detector?.enabled,
+        lockTimeoutMs: pluginConfig.governance?.conflict_detector?.lock_timeout_ms,
+        warnOnConflict: pluginConfig.governance?.conflict_detector?.warn_on_conflict,
+        blockOnConflict: pluginConfig.governance?.conflict_detector?.block_on_conflict,
+      })
+    : null;
+
   updateTerminalTitle({ sessionId: "main" });
 
   const backgroundManager = new BackgroundManager(ctx);
@@ -256,8 +351,16 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
     : null;
   const backgroundTools = createBackgroundTools(backgroundManager, ctx.client);
 
-  const callOmoAgent = createCallOmoAgent(ctx, backgroundManager);
+  const callOmoAgent = createCallOmoAgent(ctx, backgroundManager, pluginConfig);
   const lookAt = createLookAt(ctx);
+
+  // Governance tools
+  const linearBranch = createLinearBranchTool(ctx);
+  const linearUpdateStatus = createLinearUpdateStatusTool(ctx);
+  const linearCreateIssue = createLinearCreateIssueTool(ctx);
+  const readContext = createReadContextTool(ctx);
+  const createSpecFolder = createSpecFolderTool(ctx);
+  const updateWorkflowState = updateWorkflowStateTool(ctx);
 
   const googleAuthHooks = pluginConfig.google_auth
     ? await createGoogleAntigravityAuthPlugin(ctx)
@@ -273,12 +376,21 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
       ...backgroundTools,
       call_omo_agent: callOmoAgent,
       look_at: lookAt,
+      // Governance tools
+      linear_branch: linearBranch,
+      linear_update_status: linearUpdateStatus,
+      linear_create_issue: linearCreateIssue,
+      read_context: readContext,
+      create_spec_folder: createSpecFolder,
+      update_workflow_state: updateWorkflowState,
       ...(tmuxAvailable ? { interactive_bash } : {}),
     },
 
     "chat.message": async (input, output) => {
       await claudeCodeHooks["chat.message"]?.(input, output);
       await keywordDetector?.["chat.message"]?.(input, output);
+      // Governance: Linear context injection
+      await governanceLinearInjector?.["chat.message"]?.(input, output);
     },
 
     config: async (config) => {
@@ -289,7 +401,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
       );
 
       const userAgents = (pluginConfig.claude_code?.agents ?? true) ? loadUserAgents() : {};
-      const projectAgents = (pluginConfig.claude_code?.agents ?? true) ? loadProjectAgents() : {};
+      const projectAgents = (pluginConfig.claude_code?.agents ?? true) ? loadProjectAgents(ctx.directory) : {};
 
       const isOmoEnabled = pluginConfig.omo_agent?.disabled !== true;
 
@@ -353,7 +465,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
       }
 
       const mcpResult = (pluginConfig.claude_code?.mcp ?? true)
-        ? await loadMcpConfigs()
+        ? await loadMcpConfigs(ctx.directory)
         : { servers: {} };
       config.mcp = {
         ...config.mcp,
@@ -364,10 +476,10 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
       const userCommands = (pluginConfig.claude_code?.commands ?? true) ? loadUserCommands() : {};
       const opencodeGlobalCommands = loadOpencodeGlobalCommands();
       const systemCommands = config.command ?? {};
-      const projectCommands = (pluginConfig.claude_code?.commands ?? true) ? loadProjectCommands() : {};
-      const opencodeProjectCommands = loadOpencodeProjectCommands();
+      const projectCommands = (pluginConfig.claude_code?.commands ?? true) ? loadProjectCommands(ctx.directory) : {};
+      const opencodeProjectCommands = loadOpencodeProjectCommands(ctx.directory);
       const userSkills = (pluginConfig.claude_code?.skills ?? true) ? loadUserSkillsAsCommands() : {};
-      const projectSkills = (pluginConfig.claude_code?.skills ?? true) ? loadProjectSkillsAsCommands() : {};
+      const projectSkills = (pluginConfig.claude_code?.skills ?? true) ? loadProjectSkillsAsCommands(ctx.directory) : {};
 
       config.command = {
         ...userCommands,
@@ -395,6 +507,9 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
       await keywordDetector?.event(input);
       await agentUsageReminder?.event(input);
       await interactiveBashSession?.event(input);
+      // Governance: Historian and Linear injector events
+      await governanceHistorian?.event(input);
+      await governanceLinearInjector?.event(input);
 
       const { event } = input;
       const props = event.properties as Record<string, unknown> | undefined;
@@ -412,6 +527,13 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
             directory: ctx.directory,
             sessionTitle: sessionInfo?.title,
           });
+          
+          if (sessionInfo?.id) {
+            MaxTurnsEnforcer.getInstance(sessionInfo.id, {
+              maxTurns: 100,
+              warnAtTurn: 80,
+            });
+          }
         }
       }
 
@@ -432,13 +554,17 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
 
       if (event.type === "session.deleted") {
         const sessionInfo = props?.info as { id?: string } | undefined;
-        if (sessionInfo?.id === getMainSessionID()) {
-          setMainSession(undefined);
-          setCurrentSession(undefined, undefined);
-          updateTerminalTitle({
-            sessionId: "main",
-            status: "idle",
-          });
+        if (sessionInfo?.id) {
+          MaxTurnsEnforcer.removeInstance(sessionInfo.id);
+          
+          if (sessionInfo.id === getMainSessionID()) {
+            setMainSession(undefined);
+            setCurrentSession(undefined, undefined);
+            updateTerminalTitle({
+              sessionId: "main",
+              status: "idle",
+            });
+          }
         }
       }
 
@@ -488,12 +614,31 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
           });
         }
       }
+      
+      if (event.type === "message.updated") {
+        const info = props?.info as Record<string, unknown> | undefined;
+        const sessionID = info?.sessionID as string | undefined;
+        
+        if (sessionID && info?.role === "assistant") {
+          const enforcer = MaxTurnsEnforcer.getInstance(sessionID);
+          enforcer.incrementTurn();
+        }
+      }
     },
 
     "tool.execute.before": async (input, output) => {
       await claudeCodeHooks["tool.execute.before"](input, output);
       await nonInteractiveEnv?.["tool.execute.before"](input, output);
-      await commentChecker?.["tool.execute.before"](input, output);
+      await safeHookCall("comment-checker", () => commentChecker?.["tool.execute.before"](input, output));
+      
+      // Validation hooks that may throw (run BEFORE lock acquisition)
+      await gitSafetyValidator?.["tool.execute.before"](input, output);
+      await securityScanner?.["tool.execute.before"](input, output);
+      await governancePathValidator?.["tool.execute.before"](input, output);
+      await governanceDocsDelegation?.["tool.execute.before"](input, output);
+      
+      // Lock acquisition (run AFTER all validation hooks to prevent lock leaks)
+      await conflictDetector?.["tool.execute.before"](input, output);
 
       if (input.tool === "task") {
         const args = output.args as Record<string, unknown>;
@@ -520,15 +665,18 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
 
     "tool.execute.after": async (input, output) => {
       await claudeCodeHooks["tool.execute.after"](input, output);
-      await toolOutputTruncator?.["tool.execute.after"](input, output);
-      await contextWindowMonitor?.["tool.execute.after"](input, output);
-      await commentChecker?.["tool.execute.after"](input, output);
-      await directoryAgentsInjector?.["tool.execute.after"](input, output);
-      await directoryReadmeInjector?.["tool.execute.after"](input, output);
-      await rulesInjector?.["tool.execute.after"](input, output);
-      await emptyTaskResponseDetector?.["tool.execute.after"](input, output);
-      await agentUsageReminder?.["tool.execute.after"](input, output);
-      await interactiveBashSession?.["tool.execute.after"](input, output);
+      await safeHookCall("tool-output-truncator", () => toolOutputTruncator?.["tool.execute.after"](input, output));
+      await safeHookCall("context-window-monitor", () => contextWindowMonitor?.["tool.execute.after"](input, output));
+      await safeHookCall("comment-checker", () => commentChecker?.["tool.execute.after"](input, output));
+      await safeHookCall("directory-agents-injector", () => directoryAgentsInjector?.["tool.execute.after"](input, output));
+      await safeHookCall("directory-readme-injector", () => directoryReadmeInjector?.["tool.execute.after"](input, output));
+      await safeHookCall("rules-injector", () => rulesInjector?.["tool.execute.after"](input, output));
+      await safeHookCall("empty-task-response-detector", () => emptyTaskResponseDetector?.["tool.execute.after"](input, output));
+      await safeHookCall("agent-usage-reminder", () => agentUsageReminder?.["tool.execute.after"](input, output));
+      await safeHookCall("interactive-bash-session", () => interactiveBashSession?.["tool.execute.after"](input, output));
+      await securityScanner?.["tool.execute.after"](input, output);
+      await conflictDetector?.["tool.execute.after"](input, output);
+      await governanceHistorian?.["tool.execute.after"](input, output);
 
       if (input.sessionID === getMainSessionID()) {
         updateTerminalTitle({

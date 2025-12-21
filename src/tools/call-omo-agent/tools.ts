@@ -3,10 +3,22 @@ import { ALLOWED_AGENTS, CALL_OMO_AGENT_DESCRIPTION } from "./constants"
 import type { CallOmoAgentArgs } from "./types"
 import type { BackgroundManager } from "../../features/background-agent"
 import { log } from "../../shared/logger"
+import { getToolConfigForRole } from "../../config/tool-config"
+import { AGENT_ROLE_REGISTRY } from "../../agents"
+import { DelegationTracker } from "../../features/orchestration"
+import { setSessionAgent } from "../../features/claude-code-session-state/agent-registry"
+import {
+  coerceToArtifactResponse,
+  truncateArtifactResponse,
+  formatArtifactResponseForReturn,
+  type ArtifactTruncationConfig,
+} from "../../shared/artifact-response"
+import type { OhMyOpenCodeConfig } from "../../config/schema"
 
 export function createCallOmoAgent(
   ctx: PluginInput,
-  backgroundManager: BackgroundManager
+  backgroundManager: BackgroundManager,
+  config?: OhMyOpenCodeConfig
 ) {
   const agentDescriptions = ALLOWED_AGENTS.map(
     (name) => `- ${name}: Specialized agent for ${name} tasks`
@@ -33,14 +45,32 @@ export function createCallOmoAgent(
         return `Error: Invalid agent type "${args.subagent_type}". Only ${ALLOWED_AGENTS.join(", ")} are allowed.`
       }
 
+      const delegationTracker = DelegationTracker.getInstance()
+      delegationTracker.setSessionId(toolContext.sessionID)
+      
+      const fromAgent = "orchestrator"
+      const toAgent = args.subagent_type
+      
+      const delegationCheck = delegationTracker.canDelegate(fromAgent, toAgent)
+      if (!delegationCheck.allowed) {
+        log(`[call_omo_agent] Delegation blocked: ${delegationCheck.reason}`)
+        return `Error: Delegation blocked.\n\n${delegationCheck.reason}\n\nCurrent delegation depth: ${delegationCheck.depth}`
+      }
+
+      delegationTracker.recordDelegation(fromAgent, toAgent, toolContext.sessionID)
+
       if (args.run_in_background) {
         if (args.session_id) {
           return `Error: session_id is not supported in background mode. Use run_in_background=false to continue an existing session.`
         }
-        return await executeBackground(args, toolContext, backgroundManager)
+        const result = await executeBackground(args, toolContext, backgroundManager)
+        delegationTracker.popDelegation()
+        return result
       }
 
-      return await executeSync(args, toolContext, ctx)
+      const result = await executeSync(args, toolContext, ctx, config)
+      delegationTracker.popDelegation()
+      return result
     },
   })
 }
@@ -80,7 +110,8 @@ Use \`background_output\` tool with task_id="${task.id}" to check progress:
 async function executeSync(
   args: CallOmoAgentArgs,
   toolContext: { sessionID: string },
-  ctx: PluginInput
+  ctx: PluginInput,
+  config?: OhMyOpenCodeConfig
 ): Promise<string> {
   let sessionID: string
 
@@ -109,6 +140,7 @@ async function executeSync(
     }
 
     sessionID = createResult.data.id
+    setSessionAgent(sessionID, args.subagent_type)
     log(`[call_omo_agent] Created session: ${sessionID}`)
   }
 
@@ -116,14 +148,21 @@ async function executeSync(
   log(`[call_omo_agent] Prompt text:`, args.prompt.substring(0, 100))
 
   try {
+    // LIF-62: Get role-based tool restrictions for the target agent
+    const agentRole = AGENT_ROLE_REGISTRY[args.subagent_type] ?? "specialist"
+    const toolConfig = getToolConfigForRole(agentRole)
+    
+    log(`[call_omo_agent] Applying role-based config for ${args.subagent_type} (role: ${agentRole})`)
+    
     await ctx.client.session.prompt({
       path: { id: sessionID },
       body: {
         agent: args.subagent_type,
         tools: {
-          task: false,
-          call_omo_agent: false,
-          background_task: false,
+          // Apply role-based restrictions from tool-config.ts
+          task: toolConfig.task ?? false,
+          call_omo_agent: toolConfig.call_omo_agent ?? false,
+          background_task: toolConfig.background_task ?? false,
         },
         parts: [{ type: "text", text: args.prompt }],
       },
@@ -170,6 +209,31 @@ async function executeSync(
   const responseText = textParts.map((p: any) => p.text).join("\n")
 
   log(`[call_omo_agent] Got response, length: ${responseText.length}`)
+
+  const truncationEnabled = config?.governance?.artifact_truncation?.enabled !== false
+  
+  if (truncationEnabled) {
+    const truncationConfig: ArtifactTruncationConfig = {
+      maxSummaryTokenEstimate: config?.governance?.artifact_truncation?.max_summary_tokens ?? 200,
+      maxOutputChars: config?.governance?.artifact_truncation?.max_output_chars ?? 4000,
+      keepTaskMetadata: config?.governance?.artifact_truncation?.keep_task_metadata !== false,
+    }
+    
+    const artifactResponse = coerceToArtifactResponse(responseText, {
+      sessionId: sessionID,
+      fromAgent: "orchestrator",
+      toAgent: args.subagent_type,
+    })
+    
+    const truncatedResponse = truncateArtifactResponse(artifactResponse, truncationConfig)
+    
+    log(`[call_omo_agent] Applied artifact truncation, truncated: ${truncatedResponse.telemetry.truncated}`)
+    
+    return formatArtifactResponseForReturn(truncatedResponse, {
+      includeTaskMetadata: truncationConfig.keepTaskMetadata,
+      sessionId: sessionID,
+    })
+  }
 
   const output =
     responseText + "\n\n" + ["<task_metadata>", `session_id: ${sessionID}`, "</task_metadata>"].join("\n")

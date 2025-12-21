@@ -28,3 +28,16 @@ yarn.lock
 test-injection/
 notepad.md
 oauth-success.html
+
+# IDE/Editor configs - ignore .cursor/ except memory/ and specs/
+.cursor/*
+!.cursor/memory/
+!.cursor/specs/
+.codex/
+
+# OpenCode - personal/workspace-specific
+.opencode/project-context.yaml
+.opencode/node_modules/
+
+# One-off scripts
+fix_frontmatter.py

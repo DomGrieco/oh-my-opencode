@@ -19,3 +19,30 @@ export { createAgentUsageReminderHook } from "./agent-usage-reminder";
 export { createKeywordDetectorHook } from "./keyword-detector";
 export { createNonInteractiveEnvHook } from "./non-interactive-env";
 export { createInteractiveBashSessionHook } from "./interactive-bash-session";
+
+// Governance hooks
+export { createGovernancePathValidatorHook } from "./governance-path-validator";
+export { createGovernanceHistorianHook } from "./governance-historian";
+export { createGovernanceLinearInjectorHook } from "./governance-linear-injector";
+export { createGovernanceDocsDelegationHook } from "./governance-docs-delegation";
+export type { DocsDelegationConfig } from "./governance-docs-delegation";
+
+// Hook Health Manager
+export { HookHealthManager } from "./hook-health-manager";
+export type {
+  HookHealthState,
+  HookHealthConfig,
+  HookHealthSummary,
+  HookExecutionResult,
+} from "./hook-health-manager";
+
+// Safety hooks (LIF-63)
+export { createGitSafetyValidatorHook } from "./git-safety-validator";
+export type { GitSafetyConfig, GitSafetyResult } from "./git-safety-validator";
+
+export { createSecurityScannerHook } from "./security-scanner";
+export type { SecurityScannerConfig, SecretMatch, ScanResult } from "./security-scanner";
+
+// Conflict detection (LIF-63)
+export { createConflictDetectorHook } from "./conflict-detector";
+export type { ConflictDetectorConfig, FileEditLock } from "./conflict-detector";
