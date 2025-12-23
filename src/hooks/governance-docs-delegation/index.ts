@@ -3,15 +3,17 @@ import { log } from "../../shared"
 import { getAgentForSession } from "../../features/claude-code-session-state/agent-registry"
 import {
   type DocsDelegationConfig,
+  type PathCategorization,
   DEFAULT_DOCS_DELEGATION_CONFIG,
-  DOCS_PATH_PATTERNS,
+  GOVERNANCE_PATTERNS,
+  CHANGELOG_KEYWORDS,
   ALLOWED_AGENTS,
   EXCEPTED_PATHS,
 } from "./types"
 
 export * from "./types"
 
-function isDocsPath(filePath: string, projectRoot: string): boolean {
+function getRelativePath(filePath: string, projectRoot: string): string {
   let relativePath = filePath
   if (filePath.startsWith(projectRoot)) {
     relativePath = filePath.slice(projectRoot.length)
@@ -19,42 +21,78 @@ function isDocsPath(filePath: string, projectRoot: string): boolean {
       relativePath = relativePath.slice(1)
     }
   }
+  return relativePath
+}
 
-  for (const pattern of DOCS_PATH_PATTERNS) {
-    if (pattern.endsWith("/") && relativePath.startsWith(pattern)) {
-      return true
-    }
-    if (pattern.includes("*")) {
-      const parts = pattern.split("*")
-      if (parts.length === 2) {
-        const [prefix, suffix] = parts
-        if (relativePath.startsWith(prefix) && relativePath.endsWith(suffix)) {
-          return true
-        }
-      }
-    }
-    if (relativePath === pattern) {
-      return true
-    }
-    if (relativePath.endsWith(".md") || relativePath.endsWith(".mdx")) {
-      const filename = relativePath.split("/").pop() ?? ""
-      if (filename === pattern) {
+function matchesKeyword(relativePath: string, keywords: string[]): boolean {
+  const lowerPath = relativePath.toLowerCase()
+  return keywords.some((keyword) => lowerPath.includes(keyword.toLowerCase()))
+}
+
+function matchesPathPattern(relativePath: string, pattern: string): boolean {
+  if (pattern.endsWith("/") && relativePath.startsWith(pattern)) {
+    return true
+  }
+  if (pattern.includes("*")) {
+    const parts = pattern.split("*")
+    if (parts.length === 2) {
+      const [prefix, suffix] = parts
+      if (relativePath.startsWith(prefix) && relativePath.endsWith(suffix)) {
         return true
       }
     }
   }
-
+  if (relativePath === pattern) {
+    return true
+  }
+  if (relativePath.endsWith(".md") || relativePath.endsWith(".mdx")) {
+    const filename = relativePath.split("/").pop() ?? ""
+    if (filename === pattern) {
+      return true
+    }
+  }
   return false
 }
 
-function isExceptedPath(filePath: string, projectRoot: string): boolean {
-  let relativePath = filePath
-  if (filePath.startsWith(projectRoot)) {
-    relativePath = filePath.slice(projectRoot.length)
-    if (relativePath.startsWith("/")) {
-      relativePath = relativePath.slice(1)
+export function categorizeDocsPath(
+  filePath: string,
+  projectRoot: string
+): PathCategorization | null {
+  const relativePath = getRelativePath(filePath, projectRoot)
+
+  if (matchesKeyword(relativePath, CHANGELOG_KEYWORDS)) {
+    return {
+      category: "changelog",
+      agent: GOVERNANCE_PATTERNS.changelog.agent,
+      rationale: GOVERNANCE_PATTERNS.changelog.rationale,
     }
   }
+
+  for (const pattern of GOVERNANCE_PATTERNS.memory.paths) {
+    if (matchesPathPattern(relativePath, pattern)) {
+      return {
+        category: "memory",
+        agent: GOVERNANCE_PATTERNS.memory.agent,
+        rationale: GOVERNANCE_PATTERNS.memory.rationale,
+      }
+    }
+  }
+
+  for (const pattern of GOVERNANCE_PATTERNS.documentation.paths) {
+    if (matchesPathPattern(relativePath, pattern)) {
+      return {
+        category: "documentation",
+        agent: GOVERNANCE_PATTERNS.documentation.agent,
+        rationale: GOVERNANCE_PATTERNS.documentation.rationale,
+      }
+    }
+  }
+
+  return null
+}
+
+function isExceptedPath(filePath: string, projectRoot: string): boolean {
+  const relativePath = getRelativePath(filePath, projectRoot)
 
   for (const exceptedPath of EXCEPTED_PATHS) {
     if (relativePath.startsWith(exceptedPath)) {
@@ -107,7 +145,8 @@ export function createGovernanceDocsDelegationHook(
         return
       }
 
-      if (!isDocsPath(filePath, ctx.directory)) {
+      const categorization = categorizeDocsPath(filePath, ctx.directory)
+      if (!categorization) {
         return
       }
 
@@ -119,21 +158,33 @@ export function createGovernanceDocsDelegationHook(
         return
       }
 
+      const { category, agent, rationale } = categorization
+
+      const categoryLabel =
+        category === "changelog"
+          ? "Changelog updates"
+          : category === "memory"
+            ? "Memory file changes"
+            : "Documentation changes"
+
       const message = [
-        `⚠️ [Governance] Documentation delegation ${finalConfig.mode === "block" ? "BLOCKED" : "WARNING"}`,
+        `⚠️ [Governance] ${categoryLabel} ${finalConfig.mode === "block" ? "BLOCKED" : "WARNING"}`,
         `Tool: ${input.tool}`,
         `Path: ${filePath}`,
-        `Documentation changes require delegation to document-writer.`,
-        `Use: call_omo_agent(subagent_type="document-writer", run_in_background=false, prompt="...")`,
+        `${categoryLabel} must be delegated to ${agent}.`,
+        `Rationale: ${rationale}`,
+        `Use: call_omo_agent(subagent_type="${agent}", run_in_background=true, prompt="...")`,
       ].join("\n")
 
       log(message)
 
       if (finalConfig.mode === "block") {
         throw new Error(
-          `[Governance] Operation blocked: Documentation changes must be delegated to document-writer.\n` +
+          `[Governance] Operation blocked: ${categoryLabel} must be delegated to ${agent}.\n` +
             `Path: ${filePath}\n` +
-            `Remediation: call_omo_agent(subagent_type="document-writer", run_in_background=false, prompt="Write/update ${filePath}")`
+            `Rationale: ${rationale}\n` +
+            `Remediation: call_omo_agent(subagent_type="${agent}", run_in_background=true, prompt="Write/update ${filePath}")\n` +
+            `Note: Use run_in_background=false only if you need immediate verification.`
         )
       }
     },

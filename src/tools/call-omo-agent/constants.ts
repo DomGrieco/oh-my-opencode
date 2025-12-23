@@ -17,6 +17,8 @@ export const ALLOWED_AGENTS = [
   "frontend-ui-ux-engineer",
   "document-writer",
   "docs-publisher",
+  "historian",
+  "context-steward",
   // LIF-62 Phase 4A: Manager agent (can delegate to specialists)
   "implementation-specialist",
   // LIF-62 Phase 4A: Initial specialists (cannot delegate further)
