@@ -27,10 +27,10 @@
 
 | ID | Task | Status | Estimate | Dependencies | Notes |
 |----|------|--------|----------|--------------|-------|
-| T001 | Create `src/agents/historian.ts` | Not Started | 30min | - | Changelog specialist agent |
-| T002 | Create `src/agents/context-steward.ts` | Not Started | 30min | - | Project memory specialist agent |
-| T003 | Update `src/agents/document-writer.ts` prompt | Not Started | 30min | - | Refine for user-facing docs only |
-| T004 | Update `src/agents/index.ts` exports and registry | Not Started | 30min | T001, T002 | Add to builtinAgents + AGENT_ROLE_REGISTRY |
+| T001 | Create `src/agents/historian.ts` | ✅ Done | 30min | - | Changelog specialist agent |
+| T002 | Create `src/agents/context-steward.ts` | ✅ Done | 30min | - | Project memory specialist agent |
+| T003 | Update `src/agents/document-writer.ts` prompt | ✅ Done | 30min | - | Refine for user-facing docs only |
+| T004 | Update `src/agents/index.ts` exports and registry | ✅ Done | 30min | T001, T002 | Add to builtinAgents + AGENT_ROLE_REGISTRY |
 
 ### Task Details
 
@@ -103,7 +103,7 @@
 
 | ID | Task | Status | Estimate | Dependencies | Notes |
 |----|------|--------|----------|--------------|-------|
-| T005 | Update `src/tools/call-omo-agent/constants.ts` | Not Started | 15min | T004 | Add to ALLOWED_AGENTS |
+| T005 | Update `src/tools/call-omo-agent/constants.ts` | ✅ Done | 15min | T004 | Add to ALLOWED_AGENTS |
 
 ### Task Details
 
@@ -129,8 +129,8 @@
 
 | ID | Task | Status | Estimate | Dependencies | Notes |
 |----|------|--------|----------|--------------|-------|
-| T006 | Update `types.ts` with path categorization | Not Started | 30min | - | Add types + GOVERNANCE_PATTERNS |
-| T007 | Update `index.ts` with categorization logic | Not Started | 30min | T006 | Keyword matching + agent-specific errors |
+| T006 | Update `types.ts` with path categorization | ✅ Done | 30min | - | Add types + GOVERNANCE_PATTERNS |
+| T007 | Update `index.ts` with categorization logic | ✅ Done | 30min | T006 | Keyword matching + agent-specific errors |
 
 ### Task Details
 
@@ -176,8 +176,8 @@
 
 | ID | Task | Status | Estimate | Dependencies | Notes |
 |----|------|--------|----------|--------------|-------|
-| T008 | Run build verification | Not Started | 15min | T007 | typecheck + build |
-| T009 | Manual testing of governance routing | Not Started | 15min | T008 | Test all path patterns |
+| T008 | Run build verification | ✅ Done | 15min | T007 | typecheck + build |
+| T009 | Manual testing of governance routing | ⏸️ Pending | 15min | T008 | Test all path patterns |
 
 ### Task Details
 
