@@ -174,6 +174,7 @@ export function createGovernanceDocsDelegationHook(
         `${categoryLabel} must be delegated to ${agent}.`,
         `Rationale: ${rationale}`,
         `Use: call_omo_agent(subagent_type="${agent}", run_in_background=true, prompt="...")`,
+        `(Use run_in_background=false only if you need immediate verification)`,
       ].join("\n")
 
       log(message)

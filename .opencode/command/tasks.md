@@ -16,67 +16,192 @@ handoffs:
     prompt: Implement these tasks
 ---
 
+**Create todos from steps below, execute in order. Delegate task breakdown to task-planner agent.**
+
 ## User Input
 
 ```text
 $ARGUMENTS
 ```
 
-## Outline
+---
 
-Create a task breakdown from the implementation plan in the current spec folder.
+## Step 0: Validate Prerequisites (FIRST)
 
-1. **Detect spec folder**:
-   - Use `get_feature_paths()` from `.cursor/scripts/bash/common.sh` to find current spec folder
-   - Or use `--spec-dir` argument if provided
-   - Verify `plan.md` exists in spec folder
-   - Verify `spec.md` exists (required for user stories)
+### 0.1 Check for Spec Folder
 
-2. **Call Context Steward** (GOVERNANCE):
-   - Read `.opencode/agent/context-steward.md`
-   - Validate canonical path for tasks work
-   - Ensure path follows `.cursor/specs/{SPEC_DIR_NAME}/` structure
+```bash
+# Auto-detect spec folder from git branch
+BRANCH=$(git branch --show-current)
+```
 
-3. **Load tasks template**:
-   - Load `.cursor/templates/tasks-template.md` to understand structure
+Search for matching spec folder:
+```
+glob({ pattern: ".cursor/specs/*", path: "." })
+```
 
-4. **Engage Linear Coordinator Agent**:
-   - Read `.opencode/agent/linear-coordinator.md` (COMPLETE, no offset/limit)
-   - Adopt Linear Coordinator persona
-   - Create `tasks.md` at `{SPEC_DIR}/tasks.md`
-   - **DO NOT re-create spec folder** - use existing `SPEC_DIR`
-   - Follow Linear Coordinator steps exactly
-   - **LOCAL-FIRST**: Create tasks locally, ask user before creating Linear issues
+**If no spec folder found**:
+```
+❌ Preflight blocked: No spec folder found
 
-5. **Call Historian** (GOVERNANCE):
-   - Read `.opencode/agent/historian.md`
-   - Create changelog entry for Linear Coordinator work
-   - Include: mode, scope, files created, tasks created
+Fixes:
+  → Run /specify to create spec folder first
+```
 
-6. **Report completion**:
-   - Tasks file path, number of tasks created, readiness for `/implement`
+### 0.2 Verify Required Artifacts
 
-7. **Persist Workflow State** (REQUIRED):
-   ```
-   update_workflow_state({
-     specPath: "{SPEC_DIR}",
-     step: "tasks",
-     linearStatus: "in_progress"
-   })
-   ```
-   This enables session continuity and resume messages.
+Check that both `spec.md` AND `plan.md` exist:
 
-## Agent Integration
+**If `spec.md` missing**:
+```
+❌ Preflight blocked: Required artifact not found: spec.md
 
-When Linear Coordinator agent is invoked:
-- **DO NOT** create spec folder (already exists)
-- **USE** existing `SPEC_DIR`
-- **READ** `spec.md` for user stories (required)
-- **READ** `plan.md` for technical context (required)
-- **RESPECT** provided canonical path
-- **CALL** Context Steward before writing files
-- **CALL** Historian after completing work
-- **LOCAL-FIRST POLICY**: Create tasks locally first, ask user before Linear writes
+Fixes:
+  → Run /specify to create spec.md
+```
+
+**If `plan.md` missing**:
+```
+❌ Preflight blocked: Required artifact not found: plan.md
+
+Fixes:
+  → Run /plan to create plan.md
+```
+
+### 0.3 Check for Resume Context
+
+If `workflow-state.json` exists, show resume message:
+```
+📋 Resuming from: Task Breakdown (2 steps complete, last updated {date})
+📁 Spec: {SPEC_DIR}
+🔗 Linear: {ISSUE-ID}
+```
+
+---
+
+## Step 1: Load Full Context
+
+### 1.1 Load Project Context
+
+```
+read_context({ section: "all" })
+```
+
+### 1.2 Load Spec and Plan Content
+
+```
+read({ filePath: "{SPEC_DIR}/spec.md" })
+read({ filePath: "{SPEC_DIR}/plan.md" })
+```
+
+### 1.3 Analyze Codebase for Complexity Estimation
+
+Use AST analysis to understand codebase complexity:
+```
+ast_grep_search({
+  pattern: "export function $NAME($$$) { $$$ }",
+  lang: "typescript",
+  paths: ["src/"]
+})
+```
+
+This helps estimate task complexity based on similar existing code.
+
+---
+
+## Step 2: Delegate to Task Planner Agent
+
+```
+call_omo_agent(
+  subagent_type="task-planner",
+  run_in_background=false,
+  prompt="""
+  TASK: Create task breakdown from implementation plan
+  
+  SPEC_DIR: {SPEC_DIR}
+  SPEC_FILE: {SPEC_DIR}/spec.md
+  PLAN_FILE: {SPEC_DIR}/plan.md
+  TASKS_FILE: {SPEC_DIR}/tasks.md
+  
+  PROJECT CONTEXT:
+  - Tech Stack: {from read_context}
+  - Architecture: {from read_context}
+  - Codebase Complexity: {from ast_grep analysis}
+  
+  SPEC CONTENT:
+  {spec.md content}
+  
+  PLAN CONTENT:
+  {plan.md content}
+  
+  TOOLS TO USE:
+  - Use `lsp_document_symbols` to understand file structure
+  - Use `ast_grep_search` to find patterns for estimation
+  - Use `grep` to find related code sections
+  
+  REQUIREMENTS:
+  - Create phased task breakdown
+  - Phase 1: Setup (shared infrastructure)
+  - Phase 2: Foundational (blocking prerequisites)
+  - Phase 3+: User Story phases (each independently testable)
+  - Phase N: Polish & Cross-Cutting Concerns
+  - Each task should have: ID, description, estimate, dependencies
+  
+  ESTIMATION GUIDELINES:
+  - Base estimates on similar existing code patterns
+  - Include buffer for testing (20% of implementation time)
+  - Mark uncertain estimates with [?]
+  
+  LINEAR INTEGRATION (LOCAL-FIRST):
+  - Create tasks.md locally first
+  - ASK USER before creating issues in Linear via MCP
+  - If user approves, use Linear tools to create sub-issues
+  
+  DELIVERABLES:
+  - tasks.md with complete task breakdown
+  - Task table with ID, Task, Status, Estimate, Notes
+  - Checkpoints for each phase
+  - Dependency graph (which tasks block which)
+  """
+)
+```
+
+---
+
+## Step 3: Persist Workflow State (REQUIRED)
+
+```
+update_workflow_state({
+  specPath: "{SPEC_DIR}",
+  step: "tasks",
+  linearStatus: "in_progress"
+})
+```
+
+---
+
+## Step 4: Report Completion
+
+```
+✅ Task breakdown complete!
+
+📁 Tasks: {SPEC_DIR}/tasks.md
+📊 Summary: {X} tasks in {Y} phases
+⏱️ Estimated effort: {total_hours}h
+🔗 Linear: {ISSUE-ID}
+
+**Task Overview:**
+- Phase 1 (Setup): {count} tasks
+- Phase 2 (Foundation): {count} tasks
+- Phase 3+ (Features): {count} tasks
+- Phase N (Polish): {count} tasks
+
+**Next steps:**
+- Run `/implement` to start implementation
+- Or create Linear sub-issues for team assignment
+```
+
+---
 
 ## Task Organization
 
@@ -92,17 +217,41 @@ Each user story phase should include:
 - Implementation tasks
 - Checkpoint validation
 
+---
+
+## Task Table Format
+
+```markdown
+| ID | Task | Status | Estimate | Dependencies | Notes |
+|----|------|--------|----------|--------------|-------|
+| T001 | Setup project structure | Not Started | 1h | - | Foundation |
+| T002 | Create data models | Not Started | 2h | T001 | Core types |
+| T003 | Implement API endpoints | Not Started | 4h | T002 | REST API |
+```
+
+---
+
 ## Linear Integration
 
 **LOCAL-FIRST POLICY**:
 1. Create `tasks.md` locally first
 2. Optionally create Linear issues locally in `{SPEC_DIR}/linear/`
 3. **ASK USER** before creating issues in Linear via MCP
-4. If user approves, delegate to Linear Coordinator for Linear issue creation
+4. If user approves:
+   ```
+   linear_create_issue({
+     title: "{Task Title}",
+     description: "{Task Description}",
+     team: "{TEAM}",
+     labels: ["type:task"],
+     parentId: "{PARENT_ISSUE_ID}"
+   })
+   ```
+
+---
 
 ## References
 
 - Spec: `{SPEC_DIR}/spec.md`
 - Plan: `{SPEC_DIR}/plan.md` (required)
 - Template: `.cursor/templates/tasks-template.md`
-- Linear Coordinator: `.opencode/agent/linear-coordinator.md`

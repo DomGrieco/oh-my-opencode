@@ -18,131 +18,226 @@ handoffs:
     send: true
 ---
 
+**Create todos from the numbered steps below, then execute in order. Step 4 delegates to product-strategist.**
+
 ## User Input
 
 ```text
 $ARGUMENTS
 ```
 
-You **MUST** consider the user input before proceeding (if not empty).
+---
 
-## Outline
+## Step 0: Load Project Context (FIRST)
 
-The text the user typed after `/specify` in the triggering message **is** the feature description. Assume you always have it available in this conversation even if `$ARGUMENTS` appears literally below. Do not ask the user to repeat it unless they provided an empty command.
+Before any other action, load project context to understand the tech stack and conventions:
 
-Given that feature description, do this:
+```
+read_context({ section: "all" })
+```
 
-1. **Linear-First Requirement (MANDATORY)**:
-   - **If Linear MCP is available**: 
-     - **MUST** create or select a placeholder parent Linear issue BEFORE proceeding
-     - Search for existing Linear issues matching the description using `mcp_Linear_list_issues`
-     - If issue found: Use `issue.branchName` and issue ID for folder naming
-     - If issue has parent: Prompt user: "Use parent feature branch" vs "Standalone on child issue branch"
-     - **If no issue found**: 
-       - Propose creating a minimal placeholder parent issue
-       - **REQUIRE user confirmation** - if user declines, **REFUSE to proceed** (stop execution)
-       - Placeholder issue should have:
-         - Clear title (enough to identify feature)
-         - Short summary (1-2 sentences)
-         - Correct type label (`type:feature`, `type:bug`, etc.)
-         - Appropriate team assignment
-     - **CRITICAL**: No spec folder or artifacts can be created without a Linear issue existing first
-   - **If Linear MCP is NOT available**: 
-     - Fall back to non-Linear mode (sequential numbering: `{NNN}-{type}-{slug}`)
-     - Only allowed when Linear MCP is unavailable (offline mode)
+**Use this context for**:
+- Understanding project type (web-app, CLI, library, etc.)
+- Tech stack decisions (languages, frameworks)
+- Architecture patterns to follow
+- Coding conventions for the spec
 
-2. **Call create-feature.sh script**:
-   - **Linear Mode** (when Linear MCP available and issue created/selected):
-     ```bash
-     .cursor/scripts/bash/create-feature.sh --json \
-       --branch-name "{issue.branchName}" \
-       --spec-dir-name "{ISSUE-ID}-{type}-{name-slug}" \
-       --issue-id "{ISSUE-ID}" \
-       --issue-type "{type}" \
-       "$ARGUMENTS"
-     ```
-     - **MUST** have Linear issue before calling script (from step 1)
-   - **Non-Linear Mode** (ONLY when Linear MCP unavailable - offline fallback):
-     ```bash
-     .cursor/scripts/bash/create-feature.sh --json "$ARGUMENTS" --short-name "{generated-short-name}"
-     ```
-     - **ONLY** allowed when Linear MCP is not available
-     - Sequential numbering: `{NNN}-{type}-{slug}` format
-   - Parse JSON output to get `BRANCH_NAME`, `SPEC_DIR`, `SPEC_FILE`, etc.
+---
 
-3. **Call Context Steward** (GOVERNANCE):
-   - Read `.opencode/agent/context-steward.md`
-   - Validate canonical path: `SPEC_DIR` from script output
-   - Ensure path follows `.cursor/specs/{SPEC_DIR_NAME}/` structure
+## Step 1: Linear-First Requirement (MANDATORY)
 
-4. **Load spec template**:
-   - Load `.cursor/templates/spec-template.md` to understand required sections
+**If Linear MCP is available**: 
 
-5. **Engage Product Strategist Agent**:
-   - Read `.opencode/agent/product-strategist.md` (COMPLETE, no offset/limit)
-   - Adopt Product Strategist persona
-   - Create `spec.md` at `SPEC_FILE` path (from script JSON output)
-   - **DO NOT re-create spec folder** - use `SPEC_DIR` from script
-   - Follow Product Strategist steps exactly
-   - **NOTE**: Product Strategist will also create Mintlify docs in `docs/requirements/` (dual workflow)
-
-6. **Call Historian** (GOVERNANCE):
-   - Read `.opencode/agent/historian.md`
-   - Create changelog entry for Product Strategist work
-   - Include: mode, scope, files created, decisions made
-
-7. **Report completion**:
-   - Branch name, spec file path, readiness for next phase (`/plan` or `/clarify`)
-
-8. **Persist Workflow State** (REQUIRED):
+1. **Search for existing issues**:
    ```
-   update_workflow_state({
-     specPath: "{SPEC_DIR}",
-     step: "specify",
-     linearStatus: "todo"
-   })
+   linear_list_issues({ query: "{FEATURE_KEYWORDS}", limit: 5 })
    ```
-   This enables session continuity and resume messages.
+
+2. **If issue found**: 
+   - Get branch name: `linear_branch({ issueId: "{ISSUE-ID}" })`
+   - Store: `BRANCH_NAME`, `ISSUE_ID`, `ISSUE_URL`
+
+3. **If issue has parent**: 
+   - Ask user: "Use parent feature branch" vs "Standalone on child issue branch"
+
+4. **If no issue found**:
+   - Create placeholder issue:
+     ```
+     linear_create_issue({
+       title: "{Feature Title}",
+       description: "{Brief summary}",
+       team: "{TEAM}",
+       labels: ["type:feature"]
+     })
+     ```
+   - **REQUIRE user confirmation** - if user declines, **REFUSE to proceed**
+
+5. **Get branch name** after issue exists:
+   ```
+   linear_branch({ issueId: "{ISSUE-ID}" })
+   ```
+   - Returns: `{ branchName, issueTitle, issueUrl, issueIdentifier }`
+
+**If Linear MCP is NOT available**: 
+- Fall back to sequential numbering: `{NNN}-{type}-{slug}`
+- Only allowed when Linear MCP is unavailable (offline mode)
+
+---
+
+## Step 2: Create Git Worktree from `dev` (MANDATORY)
+
+```bash
+# Fetch latest dev branch
+git fetch origin dev
+
+# Get repo name from current directory
+REPO_NAME=$(basename "$(pwd)")
+
+# Create worktree with new branch based on dev
+WORKTREE_PATH="../${REPO_NAME}-worktrees/{BRANCH_NAME}"
+mkdir -p "../${REPO_NAME}-worktrees"
+git worktree add -b "{BRANCH_NAME}" "$WORKTREE_PATH" origin/dev
+```
+
+**If worktree already exists**:
+- Check: `git worktree list | grep "{BRANCH_NAME}"`
+- If exists, use existing path
+- Report to user: "Worktree already exists at {path}"
+
+**Store for subsequent steps**: `WORKTREE_PATH`
+
+---
+
+## Step 3: Create Spec Folder in Worktree
+
+```
+create_spec_folder({
+  featureName: "{feature-name}",
+  linearIssue: "{ISSUE-ID}",
+  type: "{type}",
+  basePath: "{WORKTREE_PATH}"
+})
+```
+
+**Tool returns**:
+- `path`: Relative path (e.g., `.cursor/specs/LIF-123-feat-user-auth`)
+- `folderId`: Folder ID
+- `createdFiles`: Template files created (spec.md, plan.md, tasks.md, status.md)
+
+**Set variables**:
+- `SPEC_DIR` = `{WORKTREE_PATH}/{result.path}`
+- `SPEC_FILE` = `{SPEC_DIR}/spec.md`
+
+---
+
+## Step 4: Delegate to Product Strategist Agent
+
+```
+call_omo_agent(
+  subagent_type="product-strategist",
+  run_in_background=false,
+  prompt="""
+  TASK: Create feature specification for: {FEATURE_DESCRIPTION}
+  
+  SPEC_DIR: {SPEC_DIR}
+  SPEC_FILE: {SPEC_FILE}
+  LINEAR_ISSUE: {ISSUE-ID}
+  WORKTREE_PATH: {WORKTREE_PATH}
+  
+  PROJECT CONTEXT:
+  - Project Type: {from read_context}
+  - Tech Stack: {from read_context}
+  - Architecture: {from read_context}
+  - Conventions: {from read_context}
+  
+  CONTEXT:
+  - Spec folder already created with template files
+  - Update spec.md at SPEC_FILE path (template already exists)
+  - Also create Mintlify docs in docs/requirements/ if applicable
+  
+  REQUIREMENTS:
+  - Focus on WHAT users need and WHY
+  - Avoid HOW to implement (no tech stack, APIs, code structure)
+  - Written for business stakeholders, not developers
+  - Make informed guesses, document assumptions
+  - Maximum 3 [NEEDS CLARIFICATION] markers
+  
+  DELIVERABLES:
+  - Updated spec.md with full specification
+  - User stories with acceptance criteria
+  - Success criteria (measurable, technology-agnostic)
+  """
+)
+```
+
+---
+
+## Step 5: Persist Workflow State (REQUIRED)
+
+```
+update_workflow_state({
+  specPath: "{SPEC_DIR}",
+  step: "specify",
+  linearStatus: "todo"
+})
+```
+
+This enables session continuity and resume messages.
+
+---
+
+## Step 6: Instruct User to Switch to Worktree (FINAL STEP)
+
+**Report completion summary**:
+- Linear issue: `{ISSUE-ID}` with link
+- Branch: `{BRANCH_NAME}` (based on `dev`)
+- Worktree: `{WORKTREE_PATH}`
+- Spec file: `{SPEC_FILE}`
+
+**Instruct user**:
+```
+✅ Specification complete! Your development environment is ready.
+
+**Next steps:**
+1. Close this OpenCode session (Ctrl+C or type 'exit')
+2. Run this command to switch to your new worktree:
+
+   cd {WORKTREE_PATH} && opencode
+
+3. Continue with `/plan` to create the implementation plan
+```
+
+**CRITICAL**: Do NOT continue with `/plan` in current session. User MUST switch to worktree first.
+
+---
 
 ## Linear Branch Policy
 
-**CRITICAL**: When Linear is used:
+When Linear is used:
 - Git branch MUST be `issue.branchName` from Linear (exact match)
+- Branch MUST be created from `origin/dev` as base
+- Worktree MUST be created at `../{REPO_NAME}-worktrees/{BRANCH_NAME}`
 - Spec folder MUST be `{ISSUE-ID}-{type}-{name-slug}` format
-- If issue has parent, prompt user for branch strategy (see step 1)
 
-## Agent Integration
+---
 
-When Product Strategist agent is invoked:
-- **DO NOT** create spec folder (already created by script)
-- **USE** `SPEC_DIR` from script JSON output
-- **RESPECT** provided canonical path
-- **CALL** Context Steward before writing files
-- **CALL** Historian after completing work
-- **SUPPORT** dual workflow: Creates both `.cursor/specs/` and `docs/requirements/`
+## Worktree Policy
 
-## General Guidelines
+**Why worktrees?**
+- Isolated development environment per feature
+- Clean context for OpenCode (no cross-contamination)
+- Easy parallel work on multiple features
+- Simple cleanup when feature is complete
 
-- Focus on **WHAT** users need and **WHY**
-- Avoid HOW to implement (no tech stack, APIs, code structure)
-- Written for business stakeholders, not developers
-- DO NOT create checklists embedded in spec (use `/checklist` command)
+**Worktree location**: `../{REPO_NAME}-worktrees/{BRANCH_NAME}`
 
-### Section Requirements
+**Worktree cleanup** (after feature merged):
+```bash
+git worktree remove ../{REPO_NAME}-worktrees/{BRANCH_NAME}
+git branch -d {BRANCH_NAME}
+```
 
-- **Mandatory sections**: Must be completed for every feature
-- **Optional sections**: Include only when relevant
-- When a section doesn't apply, remove it entirely (don't leave as "N/A")
-
-### For AI Generation
-
-When creating this spec from a user prompt:
-
-1. **Make informed guesses**: Use context, industry standards, and common patterns
-2. **Document assumptions**: Record reasonable defaults in Assumptions section
-3. **Limit clarifications**: Maximum 3 [NEEDS CLARIFICATION] markers
-4. **Prioritize clarifications**: scope > security/privacy > user experience > technical details
-5. **Think like a tester**: Every vague requirement should fail the "testable and unambiguous" checklist
+---
 
 ## Success Criteria Guidelines
 
@@ -160,4 +255,3 @@ Success criteria must be:
 **Bad examples** (implementation-focused):
 - "API response time is under 200ms" (too technical)
 - "Database can handle 1000 TPS" (implementation detail)
-- "React components render efficiently" (framework-specific)

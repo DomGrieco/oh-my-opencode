@@ -27,6 +27,10 @@ import { optimizationSpecialistAgent } from "./optimization-specialist"
 import { docsPublisherAgent } from "./docs-publisher"
 import { historianAgent } from "./historian"
 import { contextStewardAgent } from "./context-steward"
+// LIF-72: Workflow Specialists
+import { productStrategistAgent } from "./product-strategist"
+import { strategicPlannerAgent } from "./strategic-planner"
+import { taskPlannerAgent } from "./task-planner"
 
 export const builtinAgents: Record<string, AgentConfig> = {
   OmO: omoAgent,
@@ -56,6 +60,10 @@ export const builtinAgents: Record<string, AgentConfig> = {
   "docs-publisher": docsPublisherAgent,
   historian: historianAgent,
   "context-steward": contextStewardAgent,
+  // LIF-72: Workflow Specialists
+  "product-strategist": productStrategistAgent,
+  "strategic-planner": strategicPlannerAgent,
+  "task-planner": taskPlannerAgent,
 }
 
 /**
@@ -98,6 +106,10 @@ export const AGENT_ROLE_REGISTRY: Record<string, AgentRole> = {
   "docs-publisher": "specialist",
   historian: "specialist",
   "context-steward": "specialist",
+  // LIF-72: Workflow Specialists
+  "product-strategist": "specialist",
+  "strategic-planner": "specialist",
+  "task-planner": "specialist",
   // Advisor (read-only)
   oracle: "advisor",
   // Utility (read-only)

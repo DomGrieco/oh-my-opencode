@@ -18,89 +18,212 @@ handoffs:
     prompt: Implement this feature according to the plan
 ---
 
+**Create todos from steps below, execute in order. Delegate planning to strategic-planner agent.**
+
 ## User Input
 
 ```text
 $ARGUMENTS
 ```
 
-## Outline
+---
 
-Create an implementation plan from the feature specification in the current spec folder.
+## Step 0: Validate Prerequisites (FIRST)
 
-1. **Detect spec folder**:
-   - Use `get_feature_paths()` from `.cursor/scripts/bash/common.sh` to find current spec folder
-   - Or use `--spec-dir` argument if provided
-   - Verify `spec.md` exists in spec folder
+Before proceeding, validate that prerequisites are met:
 
-2. **Call setup-plan.sh script**:
-   ```bash
-   .cursor/scripts/bash/setup-plan.sh --json --spec-dir "{SPEC_DIR}"
-   ```
-   - Parse JSON output to get `IMPL_PLAN` path
-   - Script creates `plan.md` from template
+### 0.1 Check for Spec Folder
 
-3. **Call Context Steward** (GOVERNANCE):
-   - Read `.opencode/agent/context-steward.md`
-   - Validate canonical path for plan work
-   - Ensure path follows `.cursor/specs/{SPEC_DIR_NAME}/` structure
+```bash
+# Auto-detect spec folder from git branch
+BRANCH=$(git branch --show-current)
+```
 
-4. **Load plan template**:
-   - Load `.cursor/templates/plan-template.md` to understand structure
+Then search for matching spec folder:
+```
+glob({ pattern: ".cursor/specs/*", path: "." })
+```
 
-5. **Engage Strategic Architect Agent**:
-   - Read `.opencode/agent/strategic-architect.md` (COMPLETE, no offset/limit)
-   - Adopt Strategic Architect persona
-   - Create `plan.md` at `IMPL_PLAN` path (from script JSON output)
-   - **DO NOT re-create spec folder** - use `SPEC_DIR` from script
-   - Follow Strategic Architect steps exactly
-   - Use context7 MCP for library research if needed
-   - **NOTE**: Strategic Architect will also create Mintlify docs in `docs/architecture/` (dual workflow)
+**If no spec folder found**:
+```
+❌ Preflight blocked: No spec folder found
 
-6. **Call Historian** (GOVERNANCE):
-   - Read `.opencode/agent/historian.md`
-   - Create changelog entry for Strategic Architect work
-   - Include: mode, scope, files created, architectural decisions
+Fixes:
+  → Run /specify to create spec folder first
+```
 
-7. **Report completion**:
-   - Plan file path, readiness for next phase (`/tasks` or `/implement`)
+### 0.2 Verify Required Artifacts
 
-8. **Persist Workflow State** (REQUIRED):
-   ```
-   update_workflow_state({
-     specPath: "{SPEC_DIR}",
-     step: "plan",
-     linearStatus: "in_progress"
-   })
-   ```
-   This enables session continuity and resume messages.
+Check that `spec.md` exists in the spec folder:
 
-## Agent Integration
+**If `spec.md` missing**:
+```
+❌ Preflight blocked: Required artifact not found: spec.md
 
-When Strategic Architect agent is invoked:
-- **DO NOT** create spec folder (already exists)
-- **USE** `SPEC_DIR` from script JSON output
-- **RESPECT** provided canonical path
-- **READ** `spec.md` from same spec folder for context
-- **CALL** Context Steward before writing files
-- **CALL** Historian after completing work
-- **SUPPORT** dual workflow: Creates both `.cursor/specs/` and `docs/architecture/`
+Fixes:
+  → Run /specify to create spec.md
+```
+
+### 0.3 Check for Resume Context
+
+If `workflow-state.json` exists in spec folder, show resume message:
+```
+📋 Resuming from: Planning (1 steps complete, last updated {date})
+📁 Spec: {SPEC_DIR}
+🔗 Linear: {ISSUE-ID}
+```
+
+---
+
+## Step 1: Load Full Context
+
+### 1.1 Load Project Context
+
+```
+read_context({ section: "all" })
+```
+
+Extract and store:
+- `TECH_STACK`: Languages, frameworks, databases
+- `ARCHITECTURE`: Pattern (layered, hexagonal, etc.)
+- `CONVENTIONS`: Coding standards, naming conventions
+
+### 1.2 Load Spec Content
+
+Read the specification:
+```
+read({ filePath: "{SPEC_DIR}/spec.md" })
+```
+
+### 1.3 Load Constitution (if exists)
+
+```
+read({ filePath: ".cursor/memory/constitution.md" })
+```
+
+---
+
+## Step 2: Delegate to Strategic Planner Agent
+
+```
+call_omo_agent(
+  subagent_type="strategic-planner",
+  run_in_background=false,
+  prompt="""
+  TASK: Create implementation plan for feature specification
+  
+  SPEC_DIR: {SPEC_DIR}
+  SPEC_FILE: {SPEC_DIR}/spec.md
+  PLAN_FILE: {SPEC_DIR}/plan.md
+  
+  PROJECT CONTEXT:
+  - Tech Stack: {TECH_STACK}
+  - Architecture Pattern: {ARCHITECTURE}
+  - Conventions: {CONVENTIONS}
+  
+  SPEC CONTENT:
+  {spec.md content}
+  
+  CONSTITUTION GATES:
+  {constitution.md content if exists}
+  
+  TOOLS TO USE:
+  - Use `context7_get-library-docs` for library research
+  - Use `grep_app_searchGitHub` for implementation examples
+  - Use `lsp_workspace_symbols` to understand existing code patterns
+  - Use `ast_grep_search` to find similar implementations in codebase
+  
+  REQUIREMENTS:
+  - Create technical architecture that satisfies spec requirements
+  - Include data models, API contracts, project structure
+  - Reference constitution gates for compliance
+  - Document technical decisions and tradeoffs
+  - Research libraries using context7 MCP
+  
+  DELIVERABLES:
+  - plan.md with complete implementation plan
+  - Technical Context section (language, dependencies, storage, testing, platform)
+  - Data Model (Phase 1 design)
+  - API Contracts (if applicable)
+  - Project Structure (documentation and source code layout)
+  - Also create architecture docs in docs/architecture/ if applicable
+  """
+)
+```
+
+---
+
+## Step 3: Update Linear Status
+
+```
+linear_update_status({
+  issueId: "{ISSUE-ID}",
+  status: "in_progress",
+  comment: "Implementation plan created. Ready for task breakdown."
+})
+```
+
+---
+
+## Step 4: Persist Workflow State (REQUIRED)
+
+```
+update_workflow_state({
+  specPath: "{SPEC_DIR}",
+  step: "plan",
+  linearStatus: "in_progress"
+})
+```
+
+---
+
+## Step 5: Report Completion
+
+```
+✅ Implementation plan complete!
+
+📁 Plan: {SPEC_DIR}/plan.md
+🔗 Linear: {ISSUE-ID} (In Progress)
+
+**Next steps:**
+- Run `/tasks` to create task breakdown
+- Or run `/implement` to start implementation directly
+```
+
+---
 
 ## Plan Structure
 
 The plan should include:
-- Summary (from spec.md)
-- Technical Context (language, dependencies, storage, testing, platform)
-- Constitution Check (gates from `.cursor/memory/constitution.md`)
-- Research (Phase 0 findings using context7)
-- Data Model (Phase 1 design)
-- Contracts (Phase 1 API contracts)
-- Project Structure (documentation and source code layout)
-- Complexity Tracking (if constitution violations)
+
+| Section | Description |
+|---------|-------------|
+| Summary | From spec.md |
+| Technical Context | Language, dependencies, storage, testing, platform |
+| Constitution Check | Gates from `.cursor/memory/constitution.md` |
+| Research | Phase 0 findings using context7 |
+| Data Model | Phase 1 design |
+| Contracts | Phase 1 API contracts |
+| Project Structure | Documentation and source code layout |
+| Complexity Tracking | If constitution violations |
+
+---
+
+## Research Tools
+
+Agents should use these tools for research:
+
+| Tool | Purpose |
+|------|---------|
+| `context7_get-library-docs` | Official library documentation |
+| `grep_app_searchGitHub` | Find real-world implementation examples |
+| `deepwiki_ask_question` | Ask about specific repository patterns |
+| `websearch_exa_web_search_exa` | General web search for solutions |
+
+---
 
 ## References
 
 - Spec: `{SPEC_DIR}/spec.md`
 - Template: `.cursor/templates/plan-template.md`
 - Constitution: `.cursor/memory/constitution.md`
-- Strategic Architect: `.opencode/agent/strategic-architect.md`
