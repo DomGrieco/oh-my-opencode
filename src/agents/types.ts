@@ -31,9 +31,17 @@ export type BuiltinAgentName =
   | "optimization-specialist"
   // Documentation specialists
   | "docs-publisher"
+  // LIF-72: Workflow Specialists
+  | "product-strategist"
+  | "strategic-planner"
+  | "task-planner"
+  // LIF-73: Context Learning
+  | "context-learner"
 
 export type OverridableAgentName =
   | "build"
+  | "plan"
+  | "OmO-Plan"
   | BuiltinAgentName
 
 export type AgentName = BuiltinAgentName
@@ -136,6 +144,10 @@ export const DELEGATABLE_AGENTS = [
   "optimization-specialist",
   // Documentation specialists
   "docs-publisher",
+  // LIF-72: Workflow Specialists
+  "product-strategist",
+  "strategic-planner",
+  "task-planner",
 ] as const
 
 export type DelegatableAgentName = (typeof DELEGATABLE_AGENTS)[number]

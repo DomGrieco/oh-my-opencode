@@ -17,13 +17,39 @@ const AgentPermissionSchema = z.object({
 })
 
 export const BuiltinAgentNameSchema = z.enum([
+  // Primary orchestrator
   "OmO",
+  // Core agents
   "oracle",
   "librarian",
   "explore",
   "frontend-ui-ux-engineer",
   "document-writer",
   "multimodal-looker",
+  // Workflow specialists (LIF-72)
+  "product-strategist",
+  "strategic-planner",
+  "task-planner",
+  // LIF-62 Manager
+  "implementation-specialist",
+  // LIF-62 Language/Platform Specialists
+  "backend-typescript",
+  "frontend-react",
+  "backend-rust",
+  "backend-python",
+  "mobile-xcode",
+  "mobile-react-native",
+  // LIF-62 AI/ML Specialists
+  "ai-ml-expert",
+  "agent-specialist",
+  // LIF-62 Cross-Cutting Specialists
+  "security-specialist",
+  "test-specialist",
+  "optimization-specialist",
+  // Documentation
+  "docs-publisher",
+  // LIF-73 Context Learning
+  "context-learner",
 ])
 
 export const OverridableAgentNameSchema = z.enum([
@@ -37,6 +63,23 @@ export const OverridableAgentNameSchema = z.enum([
   "frontend-ui-ux-engineer",
   "document-writer",
   "multimodal-looker",
+  "product-strategist",
+  "strategic-planner",
+  "task-planner",
+  "implementation-specialist",
+  "backend-typescript",
+  "frontend-react",
+  "backend-rust",
+  "backend-python",
+  "mobile-xcode",
+  "mobile-react-native",
+  "ai-ml-expert",
+  "agent-specialist",
+  "security-specialist",
+  "test-specialist",
+  "optimization-specialist",
+  "docs-publisher",
+  "context-learner",
 ])
 
 export const AgentNameSchema = BuiltinAgentNameSchema
@@ -70,23 +113,30 @@ export const HookNameSchema = z.enum([
   "git-safety-validator",
   "security-scanner",
   "conflict-detector",
+  "workflow-state-enforcer",
+  "meta-learning-extractor",
 ])
 
-export const AgentOverrideConfigSchema = z.object({
-  model: z.string().optional(),
-  temperature: z.number().min(0).max(2).optional(),
-  top_p: z.number().min(0).max(1).optional(),
-  prompt: z.string().optional(),
-  tools: z.record(z.string(), z.boolean()).optional(),
-  disable: z.boolean().optional(),
-  description: z.string().optional(),
-  mode: z.enum(["subagent", "primary", "all"]).optional(),
-  color: z
-    .string()
-    .regex(/^#[0-9A-Fa-f]{6}$/)
-    .optional(),
-  permission: AgentPermissionSchema.optional(),
-})
+export const AgentOverrideConfigSchema = z
+  .object({
+    model: z.string().optional(),
+    temperature: z.number().min(0).max(2).optional(),
+    top_p: z.number().min(0).max(1).optional(),
+    prompt: z.string().optional(),
+    tools: z.record(z.string(), z.boolean()).optional(),
+    disable: z.boolean().optional(),
+    description: z.string().optional(),
+    mode: z.enum(["subagent", "primary", "all"]).optional(),
+    color: z
+      .string()
+      .regex(/^#[0-9A-Fa-f]{6}$/)
+      .optional(),
+    maxSteps: z.number().min(1).optional(),
+    permission: AgentPermissionSchema.optional(),
+    max_tokens: z.number().min(1).optional(),
+    reasoning_effort: z.enum(["low", "medium", "high"]).optional(),
+  })
+  .passthrough()
 
 export const AgentOverridesSchema = z.object({
   build: AgentOverrideConfigSchema.optional(),
@@ -99,6 +149,22 @@ export const AgentOverridesSchema = z.object({
   "frontend-ui-ux-engineer": AgentOverrideConfigSchema.optional(),
   "document-writer": AgentOverrideConfigSchema.optional(),
   "multimodal-looker": AgentOverrideConfigSchema.optional(),
+  "product-strategist": AgentOverrideConfigSchema.optional(),
+  "strategic-planner": AgentOverrideConfigSchema.optional(),
+  "task-planner": AgentOverrideConfigSchema.optional(),
+  "implementation-specialist": AgentOverrideConfigSchema.optional(),
+  "backend-typescript": AgentOverrideConfigSchema.optional(),
+  "frontend-react": AgentOverrideConfigSchema.optional(),
+  "backend-rust": AgentOverrideConfigSchema.optional(),
+  "backend-python": AgentOverrideConfigSchema.optional(),
+  "mobile-xcode": AgentOverrideConfigSchema.optional(),
+  "mobile-react-native": AgentOverrideConfigSchema.optional(),
+  "ai-ml-expert": AgentOverrideConfigSchema.optional(),
+  "agent-specialist": AgentOverrideConfigSchema.optional(),
+  "security-specialist": AgentOverrideConfigSchema.optional(),
+  "test-specialist": AgentOverrideConfigSchema.optional(),
+  "optimization-specialist": AgentOverrideConfigSchema.optional(),
+  "docs-publisher": AgentOverrideConfigSchema.optional(),
 })
 
 export const ClaudeCodeConfigSchema = z.object({
@@ -113,6 +179,24 @@ export const OmoAgentConfigSchema = z.object({
   disabled: z.boolean().optional(),
 })
 
+// Memory Tools configuration (LIF-73)
+export const MemoryToolsConfigSchema = z.object({
+  enabled: z.boolean().default(true),
+  memory_path: z.string().default("context/memory/"),
+})
+
+// Meta-Learning Extractor configuration (LIF-73)
+export const MetaLearningConfigSchema = z.object({
+  enabled: z.boolean().default(true),
+  signal_threshold: z.number().min(0).max(10).default(3),
+  cooldown_minutes: z.number().min(0).default(30),
+  context_threshold_percent: z.number().min(0).max(100).default(60),
+  max_candidates_per_session: z.number().min(1).max(10).default(3),
+  min_confidence: z.number().min(0).max(1).default(0.5),
+  max_extractions_per_day: z.number().min(1).default(10),
+  storage_path: z.string().default("context/learnings/"),
+})
+
 // Governance configuration schemas
 export const GovernancePathValidationSchema = z.object({
   enabled: z.boolean().default(true),
@@ -120,6 +204,7 @@ export const GovernancePathValidationSchema = z.object({
   allowed_paths: z.array(z.string()).default([
     "context/specs/",
     "context/memory/",
+    "context/learnings/",
     ".cursor/specs/",
     ".cursor/memory/",
     ".opencode/",
@@ -197,6 +282,23 @@ export const GovernanceDelegationComplianceSchema = z.object({
   strikes_to_block: z.number().default(3),
 })
 
+export const WorkflowStateEnforcerSchema = z.object({
+  enabled: z.boolean().default(true),
+  mode: z.enum(["warn", "block", "disabled"]).default("warn"),
+  workflow_agents: z.record(z.string(), z.string()).default({
+    "/specify": "product-strategist",
+    "/plan": "strategic-planner",
+    "/tasks": "task-planner",
+  }),
+  prerequisites: z.record(z.string(), z.array(z.string())).default({
+    "/plan": ["spec.md"],
+    "/tasks": ["plan.md"],
+    "/implement": ["tasks.md"],
+    "/review": ["spec.md"],
+    "/test": ["spec.md"],
+  }),
+})
+
 export const OrchestrationConfigSchema = z.object({
   max_turns: z.number().default(10),
   max_delegation_depth: z.number().default(5),
@@ -219,6 +321,7 @@ export const GovernanceConfigSchema = z.object({
   docs_blocking: GovernanceDocsBlockingSchema.optional(),
   artifact_truncation: GovernanceArtifactTruncationSchema.optional(),
   delegation_compliance: GovernanceDelegationComplianceSchema.optional(),
+  workflow_state_enforcer: WorkflowStateEnforcerSchema.optional(),
 })
 
 export const OhMyOpenCodeConfigSchema = z.object({
@@ -231,6 +334,8 @@ export const OhMyOpenCodeConfigSchema = z.object({
   google_auth: z.boolean().optional(),
   omo_agent: OmoAgentConfigSchema.optional(),
   governance: GovernanceConfigSchema.optional(),
+  memory_tools: MemoryToolsConfigSchema.optional(),
+  meta_learning: MetaLearningConfigSchema.optional(),
 })
 
 export type OhMyOpenCodeConfig = z.infer<typeof OhMyOpenCodeConfigSchema>
@@ -252,5 +357,8 @@ export type GovernanceArtifactTruncationConfig = z.infer<typeof GovernanceArtifa
 export type GovernanceDelegationComplianceConfig = z.infer<typeof GovernanceDelegationComplianceSchema>
 export type OrchestrationConfig = z.infer<typeof OrchestrationConfigSchema>
 export type LinearPolicy = z.infer<typeof LinearPolicySchema>
+export type WorkflowStateEnforcerConfig = z.infer<typeof WorkflowStateEnforcerSchema>
+export type MemoryToolsConfig = z.infer<typeof MemoryToolsConfigSchema>
+export type MetaLearningConfig = z.infer<typeof MetaLearningConfigSchema>
 
 export { McpNameSchema, type McpName } from "../mcp/types"

@@ -16,6 +16,7 @@ export const ALLOWED_AGENTS = [
   // Specialist agents (can modify files) - existing
   "frontend-ui-ux-engineer",
   "document-writer",
+  "docs-publisher",
   // LIF-62 Phase 4A: Manager agent (can delegate to specialists)
   "implementation-specialist",
   // LIF-62 Phase 4A: Initial specialists (cannot delegate further)
@@ -33,6 +34,14 @@ export const ALLOWED_AGENTS = [
   "security-specialist",
   "test-specialist",
   "optimization-specialist",
+  // LIF-70: Advisor agent
+  "oracle",
+  // LIF-72: Workflow Specialists
+  "product-strategist",
+  "strategic-planner",
+  "task-planner",
+  // LIF-73: Meta-learning agent
+  "context-learner",
 ] as const
 
 export const CALL_OMO_AGENT_DESCRIPTION = `Launch a new agent to handle complex, multi-step tasks autonomously.

@@ -187,6 +187,7 @@ I want to make sure I approach this correctly:
 You MUST use todowrite/todoread for ANY task with 2+ steps. No exceptions.
 
 ### When to Create Todos
+- **Command present** → Create todos from command steps FIRST
 - User request arrives → Immediately break into todos
 - You discover subtasks → Add them to todos
 - You encounter blockers → Add investigation todos
@@ -236,6 +237,11 @@ NO evidence = NOT complete. Period.
 <Blocking_Gates>
 ## Mandatory Gates (BLOCKING - violation = STOP)
 
+### GATE 0: Command Execution
+- [BLOCKING] If \`<command-instruction>\` present → Follow its steps literally
+- [BLOCKING] Create todos from numbered steps, execute in order
+- [BLOCKING] If step says "delegate to X" → Call that agent, don't do it yourself
+
 ### GATE 1: Pre-Search
 - [BLOCKING] MUST assess search scope before firing agents
 - [BLOCKING] MUST try direct tools (grep/glob/LSP) first for simple queries
@@ -248,7 +254,7 @@ NO evidence = NOT complete. Period.
 
 ### GATE 2.5: Frontend Files (HARD BLOCK)
 - [BLOCKING] If file is .tsx/.jsx/.vue/.svelte/.css/.scss → STOP
-- [BLOCKING] MUST delegate to Frontend Engineer via \`task(subagent_type="frontend-ui-ux-engineer")\`
+- [BLOCKING] MUST delegate to Frontend Engineer via \`call_omo_agent(subagent_type="frontend-ui-ux-engineer", run_in_background=false)\`
 - [BLOCKING] NO direct edits to frontend files, no matter how trivial
 - This applies to: color changes, margin tweaks, className additions, ANY visual change
 
@@ -425,7 +431,7 @@ When invoking Oracle, briefly mention why: "I'm going to consult Oracle for arch
 
 ### Specialized Agents
 
-**Implementation Specialist** — \`task(subagent_type="implementation-specialist")\`
+**Implementation Specialist** — \`call_omo_agent(subagent_type="implementation-specialist", run_in_background=false)\`
 
 **USE FOR COMPLEX MULTI-DOMAIN IMPLEMENTATION**
 
@@ -450,7 +456,7 @@ The Implementation Specialist is a **manager-level agent** that coordinates doma
 
 **Prompt template:**
 \`\`\`
-task(subagent_type="implementation-specialist", prompt="""
+call_omo_agent(subagent_type="implementation-specialist", run_in_background=false, prompt="""
 TASK: [specific implementation task]
 EXPECTED OUTCOME: [concrete deliverables]
 REQUIRED SKILLS: implementation-specialist
@@ -463,7 +469,7 @@ CONTEXT: [file paths, architecture context, related specs]
 
 ---
 
-**Frontend Engineer** — \`task(subagent_type="frontend-ui-ux-engineer")\`
+**Frontend Engineer** — \`call_omo_agent(subagent_type="frontend-ui-ux-engineer", run_in_background=false)\`
 
 **MANDATORY DELEGATION — NO EXCEPTIONS**
 
@@ -485,7 +491,7 @@ CONTEXT: [file paths, architecture context, related specs]
 
 **Prompt template:**
 \`\`\`
-task(subagent_type="frontend-ui-ux-engineer", prompt="""
+call_omo_agent(subagent_type="frontend-ui-ux-engineer", run_in_background=false, prompt="""
 TASK: [specific UI task]
 EXPECTED OUTCOME: [visual result expected]
 REQUIRED SKILLS: frontend-ui-ux-engineer
@@ -496,7 +502,7 @@ CONTEXT: [file paths, design requirements]
 """)
 \`\`\`
 
-**Document Writer** — \`task(subagent_type="document-writer")\`
+**Document Writer** — \`call_omo_agent(subagent_type="document-writer", run_in_background=false)\`
 - **USE FOR**: README, API docs, user guides, architecture docs
 
 **Explore** — \`background_task(agent="explore")\` ← **YOUR CONTEXTUAL GREP**
@@ -1131,4 +1137,7 @@ export const omoAgent: AgentConfig = {
   maxTokens: 64000,
   prompt: OMO_SYSTEM_PROMPT,
   color: "#00CED1",
+  tools: {
+    task: false,
+  },
 }

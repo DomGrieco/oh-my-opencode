@@ -28,6 +28,8 @@ import {
   createGitSafetyValidatorHook,
   createSecurityScannerHook,
   createConflictDetectorHook,
+  createWorkflowStateEnforcerHook,
+  createMetaLearningExtractorHook,
 } from "./hooks";
 import { createGoogleAntigravityAuthPlugin } from "./auth/antigravity";
 import {
@@ -63,9 +65,16 @@ import {
   createLinearBranchTool,
   createLinearUpdateStatusTool,
   createLinearCreateIssueTool,
+  createLinearArchiveIssueTool,
+  createLinearGetIssueTool,
+  createLinearAddCommentTool,
+  createLinearUpdateIssueTool,
   createReadContextTool,
   createSpecFolderTool,
   updateWorkflowStateTool,
+  createExtractLearningsTool,
+  // Sync fork tool
+  createSyncForkTool,
 } from "./tools";
 import { BackgroundManager } from "./features/background-agent";
 import { createBuiltinMcps } from "./mcp";
@@ -342,6 +351,11 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
       })
     : null;
 
+  // LIF-72: Workflow state enforcer
+  const workflowStateEnforcer = isHookEnabled("workflow-state-enforcer")
+    ? createWorkflowStateEnforcerHook(ctx, pluginConfig.governance?.workflow_state_enforcer)
+    : null;
+
   updateTerminalTitle({ sessionId: "main" });
 
   const backgroundManager = new BackgroundManager(ctx);
@@ -349,6 +363,11 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
   const backgroundNotificationHook = isHookEnabled("background-notification")
     ? createBackgroundNotificationHook(backgroundManager)
     : null;
+  
+  const metaLearningExtractorHook = isHookEnabled("meta-learning-extractor")
+    ? createMetaLearningExtractorHook(ctx, backgroundManager, pluginConfig.meta_learning)
+    : null;
+  
   const backgroundTools = createBackgroundTools(backgroundManager, ctx.client);
 
   const callOmoAgent = createCallOmoAgent(ctx, backgroundManager, pluginConfig);
@@ -358,9 +377,17 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
   const linearBranch = createLinearBranchTool(ctx);
   const linearUpdateStatus = createLinearUpdateStatusTool(ctx);
   const linearCreateIssue = createLinearCreateIssueTool(ctx);
+  const linearArchiveIssue = createLinearArchiveIssueTool(ctx);
+  const linearGetIssue = createLinearGetIssueTool(ctx);
+  const linearAddComment = createLinearAddCommentTool(ctx);
+  const linearUpdateIssue = createLinearUpdateIssueTool(ctx);
   const readContext = createReadContextTool(ctx);
   const createSpecFolder = createSpecFolderTool(ctx);
   const updateWorkflowState = updateWorkflowStateTool(ctx);
+  const extractLearnings = createExtractLearningsTool(ctx, {
+    transcriptPath: pluginConfig.meta_learning?.storage_path?.replace(/learnings\/?$/, "transcripts") ?? "context/transcripts",
+  });
+  const syncFork = createSyncForkTool(ctx);
 
   const googleAuthHooks = pluginConfig.google_auth
     ? await createGoogleAntigravityAuthPlugin(ctx)
@@ -380,9 +407,15 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
       linear_branch: linearBranch,
       linear_update_status: linearUpdateStatus,
       linear_create_issue: linearCreateIssue,
+      linear_archive_issue: linearArchiveIssue,
+      linear_get_issue: linearGetIssue,
+      linear_add_comment: linearAddComment,
+      linear_update_issue: linearUpdateIssue,
       read_context: readContext,
       create_spec_folder: createSpecFolder,
       update_workflow_state: updateWorkflowState,
+      extract_learnings: extractLearnings,
+      sync_fork: syncFork,
       ...(tmuxAvailable ? { interactive_bash } : {}),
     },
 
@@ -391,6 +424,8 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
       await keywordDetector?.["chat.message"]?.(input, output);
       // Governance: Linear context injection
       await governanceLinearInjector?.["chat.message"]?.(input, output);
+      // LIF-72: Workflow state enforcement
+      await workflowStateEnforcer?.["chat.message"]?.(input, output);
     },
 
     config: async (config) => {
@@ -510,6 +545,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
       // Governance: Historian and Linear injector events
       await governanceHistorian?.event(input);
       await governanceLinearInjector?.event(input);
+      await metaLearningExtractorHook?.event(input);
 
       const { event } = input;
       const props = event.properties as Record<string, unknown> | undefined;

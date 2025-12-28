@@ -39,5 +39,9 @@ oauth-success.html
 .opencode/project-context.yaml
 .opencode/node_modules/
 
+# Context learning data (LIF-73)
+# Track learnings, ignore large ephemeral transcripts
+context/transcripts/
+
 # One-off scripts
 fix_frontmatter.py
