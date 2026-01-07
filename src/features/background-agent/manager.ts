@@ -13,6 +13,7 @@ import {
   MESSAGE_STORAGE,
 } from "../hook-message-injector"
 import { subagentSessions } from "../claude-code-session-state"
+import { setSessionAgent } from "../claude-code-session-state/agent-registry"
 
 const TASK_TTL_MS = 30 * 60 * 1000
 
@@ -98,6 +99,7 @@ export class BackgroundManager {
 
     const sessionID = createResult.data.id
     subagentSessions.add(sessionID)
+    setSessionAgent(sessionID, input.agent)
 
     const task: BackgroundTask = {
       id: `bg_${crypto.randomUUID().slice(0, 8)}`,
