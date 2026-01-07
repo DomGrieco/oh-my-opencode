@@ -1,0 +1,25 @@
+{
+  "version": 1,
+  "upstream": {
+    "remote": "upstream",
+    "branch": "master",
+    "lastFetchedAt": "2026-01-07T05:30:00.000Z"
+  },
+  "lastReviewedCommit": "83676b3",
+  "lastReviewedAt": "2026-01-07T06:30:00.000Z",
+  "lastReviewedVersion": "v2.14.0",
+  "commits": {
+    "b5c1cfb": {
+      "status": "applied_manually",
+      "note": "keyword-detector mainSessionID fix - adapted to our implementation (we use detectKeywords + injectHookMessage, upstream uses detectKeywordsWithType + direct mutation)"
+    },
+    "ad44af9": {
+      "status": "not_applicable",
+      "note": "slashcommand lazyContentLoader fix - our architecture differs: separate skill and slashcommand tools, skill already loads content eagerly"
+    },
+    "d4347e8": {
+      "status": "feature_not_ported",
+      "note": "auto-slash-command hook - new feature, not a bugfix, would need full port of the feature"
+    }
+  }
+}
