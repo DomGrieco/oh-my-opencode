@@ -4,6 +4,8 @@ import { composeForkExtensions } from "./sisyphus-fork-extensions"
 
 const DEFAULT_MODEL = "anthropic/claude-opus-4-5"
 
+// Powerful AI orchestrator for OpenCode (fork).
+// This is a thin wrapper over Sisyphus.
 const OMO_DESCRIPTION =
   "Powerful AI orchestrator for OpenCode (fork). " +
   "Built on Sisyphus foundation with spec-driven workflow, " +
