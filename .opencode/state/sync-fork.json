@@ -9,17 +9,81 @@
   "lastReviewedAt": "2026-01-07T06:30:00.000Z",
   "lastReviewedVersion": "v2.14.0",
   "commits": {
+    "83676b3": {
+      "status": "skipped",
+      "reason": "release: v2.14.0 - version bump only"
+    },
+    "398075f": {
+      "status": "skipped",
+      "reason": "refactor(librarian): optimize prompt - cosmetic change, our librarian has different prompt"
+    },
+    "d4347e8": {
+      "status": "feature_not_ported",
+      "note": "auto-slash-command hook - new UX feature, not a bugfix, would need full port (~200 lines)"
+    },
+    "980b685": {
+      "status": "already_present",
+      "note": "fix(background-agent): release concurrency - already in our fork"
+    },
     "b5c1cfb": {
       "status": "applied_manually",
-      "note": "keyword-detector mainSessionID fix - adapted to our implementation (we use detectKeywords + injectHookMessage, upstream uses detectKeywordsWithType + direct mutation)"
+      "note": "keyword-detector mainSessionID fix - adapted to our implementation (we use detectKeywords + injectHookMessage)"
+    },
+    "cd97572": {
+      "status": "skipped",
+      "reason": "CLA signature - @atripathy86"
+    },
+    "b9ec4c7": {
+      "status": "skipped",
+      "reason": "docs: add GitHub follow badge - cosmetic"
+    },
+    "2064568": {
+      "status": "skipped",
+      "reason": "fix: correct spawn mock type in session-notification test - test file only"
     },
     "ad44af9": {
       "status": "not_applicable",
       "note": "slashcommand lazyContentLoader fix - our architecture differs: separate skill and slashcommand tools, skill already loads content eagerly"
     },
-    "d4347e8": {
-      "status": "feature_not_ported",
-      "note": "auto-slash-command hook - new feature, not a bugfix, would need full port of the feature"
+    "d331b48": {
+      "status": "already_present",
+      "note": "fix: verify zsh exists - already have findZshPath in command-executor.ts"
+    },
+    "4a38e70": {
+      "status": "already_present",
+      "note": "fix(session-notification): node:child_process - already have this import"
+    },
+    "204ea31": {
+      "status": "skipped",
+      "reason": "docs: remove Korean README - cosmetic"
+    },
+    "a2bfb5e": {
+      "status": "already_present",
+      "note": "feat(mcp): restore Exa websearch - already have src/mcp/websearch-exa.ts"
+    },
+    "f25f7ed": {
+      "status": "already_present",
+      "note": "feat(background-agent): model-based concurrency - already in our fork"
+    },
+    "29dbc0f": {
+      "status": "skipped",
+      "reason": "chore: cleanup agent model references - cosmetic"
+    },
+    "544212f": {
+      "status": "skipped",
+      "reason": "docs: add Korean README translation - cosmetic"
+    },
+    "f3eed73": {
+      "status": "skipped",
+      "reason": "remove: Korean README - cosmetic"
+    },
+    "6f1cabd": {
+      "status": "skipped",
+      "reason": "CLA signature - @JohnC0de"
+    },
+    "15571d3": {
+      "status": "skipped",
+      "reason": "CLA signature - @ananas-viber"
     }
   }
 }
