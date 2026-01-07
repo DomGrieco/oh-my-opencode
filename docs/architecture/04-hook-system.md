@@ -47,10 +47,10 @@ The hooks are logically grouped into five categories:
 
 | Category | Hooks | Purpose |
 |----------|-------|---------|
-| **Session** | `session-recovery`, `session-notification`, `todo-continuation-enforcer`, `background-notification` | Manage session state, recovery, and user notifications. |
-| **Tool** | `comment-checker`, `tool-output-truncator`, `grep-output-truncator`, `rules-injector`, `directory-agents-injector`, `directory-readme-injector`, `empty-task-response-detector`, `non-interactive-env`, `interactive-bash-session` | Enhance tool behavior, manage output size, and inject context. |
+| **Session** | `session-recovery`, `session-notification`, `todo-continuation-enforcer`, `background-notification`, `empty-message-sanitizer`, `thinking-block-validator` | Manage session state, recovery, and user notifications. |
+| **Tool** | `comment-checker`, `tool-output-truncator`, `grep-output-truncator`, `rules-injector`, `directory-agents-injector`, `directory-readme-injector`, `empty-task-response-detector`, `non-interactive-env`, `interactive-bash-session`, `edit-error-recovery` | Enhance tool behavior, manage output size, and inject context. |
 | **Chat** | `claude-code-hooks`, `keyword-detector`, `agent-usage-reminder`, `think-mode`, `context-window-monitor` | Modify chat flow, inject prompts, and monitor model constraints. |
-| **Utility** | `auto-update-checker`, `anthropic-auto-compact` | Maintenance tasks and automatic session optimization. |
+| **Utility** | `auto-update-checker`, `anthropic-auto-compact`, `preemptive-compaction`, `compaction-context-injector` | Maintenance tasks and automatic session optimization. |
 | **Governance** | `governance-path-validator`, `governance-historian`, `governance-linear-injector` | Enforce project standards, track changes, and link to external systems. |
 
 ## Hook Chain Pattern
@@ -112,6 +112,36 @@ Injects relevant project rules into tool outputs based on the file being accesse
 - **Discovery**: Searches for `.cursorrules` or `.cursor/rules/*.mdc` files from the file's directory up to the project root.
 - **Matching**: Parses frontmatter to match rules against the current file path using glob patterns.
 - **Injection**: Appends the rule content to the tool output, ensuring the AI is aware of specific coding standards for that file.
+
+### Preemptive Compaction
+Proactively triggers session compaction before hitting model context limits to maintain performance and prevent session crashes.
+- **Purpose**: To manage the context window proactively before reaching the model's hard limit.
+- **Trigger**: Evaluated after every message; triggers when context usage exceeds the threshold.
+- **Configuration**: Managed via `experimental.preemptive_compaction` (boolean) and `experimental.threshold` (default 0.7).
+
+### Compaction Context Injector
+Ensures continuity of the task by preserving critical state across compaction events.
+- **Purpose**: Prevents the AI from losing track of its original goals and progress when a session is compacted.
+- **Trigger**: Runs during the session compaction lifecycle event.
+- **Configuration**: Automatically active when `preemptive-compaction` or `anthropic-auto-compact` is used.
+
+### Empty Message Sanitizer
+Sanitizes assistant messages to prevent API-level errors from certain model providers.
+- **Purpose**: Some providers fail if an assistant response contains no content or tool calls. This hook injects safe placeholders to maintain flow.
+- **Trigger**: Intercepts messages during the `chat.message` lifecycle phase.
+- **Configuration**: Enabled by default; can be disabled via the `disabled_hooks` config array.
+
+### Thinking Block Validator
+Maintains the integrity of reasoning chains for models with extended thinking capabilities.
+- **Purpose**: Validates that required thinking blocks are present and properly structured for models like Claude Opus 4.5.
+- **Trigger**: Runs on `chat.message` for every assistant response.
+- **Configuration**: Enabled automatically for supported models.
+
+### Edit Error Recovery
+Auto-recovers from file editing failures to improve the success rate of modifications.
+- **Purpose**: Handles common errors like "oldString not found" by analyzing the file and providing intelligent hints to the agent.
+- **Trigger**: Runs in `tool.execute.after` specifically for the `edit` tool when an error occurs.
+- **Configuration**: Active by default for all editing tasks.
 
 <Note>
 Governance hooks are documented in detail in the [Governance Documentation](/architecture/05-governance).
