@@ -13,6 +13,8 @@ import type {
   TaskProgress,
   LaunchInput,
 } from "../../../src/features/background-agent/types"
+import { getToolConfigForRole } from "../../../src/config/tool-config"
+import { AGENT_ROLE_REGISTRY } from "../../../src/agents"
 
 function createMockTask(overrides: Partial<BackgroundTask> = {}): BackgroundTask {
   return {
@@ -428,5 +430,190 @@ describe("BackgroundTask TTL", () => {
 
     const age = now - freshTask.startedAt.getTime()
     expect(age <= TASK_TTL_MS).toBe(true)
+  })
+})
+
+describe("Role-based Tool Restrictions (LIF-111 Regression Guard)", () => {
+  describe("Role Lookup Behavior", () => {
+    test("should use role from AGENT_ROLE_REGISTRY when agent exists", () => {
+      expect(AGENT_ROLE_REGISTRY["explore"]).toBe("utility")
+      expect(AGENT_ROLE_REGISTRY["librarian"]).toBe("utility")
+      expect(AGENT_ROLE_REGISTRY["oracle"]).toBe("advisor")
+      expect(AGENT_ROLE_REGISTRY["backend-typescript"]).toBe("specialist")
+      expect(AGENT_ROLE_REGISTRY["implementation-specialist"]).toBe("manager")
+      expect(AGENT_ROLE_REGISTRY["OmO"]).toBe("team-lead")
+    })
+
+    test("should default to specialist when agent is NOT in registry", () => {
+      const unknownAgent = "unknown-custom-agent"
+      const role = AGENT_ROLE_REGISTRY[unknownAgent] ?? "specialist"
+      expect(role).toBe("specialist")
+    })
+
+    test("AGENT_ROLE_REGISTRY should be exported and accessible", () => {
+      expect(AGENT_ROLE_REGISTRY).toBeDefined()
+      expect(typeof AGENT_ROLE_REGISTRY).toBe("object")
+      expect(Object.keys(AGENT_ROLE_REGISTRY).length).toBeGreaterThan(0)
+    })
+  })
+
+  describe("Tool Restriction Application by Role", () => {
+    test("utility role agents should have write=false, edit=false", () => {
+      const utilityConfig = getToolConfigForRole("utility")
+      expect(utilityConfig.write).toBe(false)
+      expect(utilityConfig.edit).toBe(false)
+    })
+
+    test("advisor role agents should have write=false, edit=false", () => {
+      const advisorConfig = getToolConfigForRole("advisor")
+      expect(advisorConfig.write).toBe(false)
+      expect(advisorConfig.edit).toBe(false)
+    })
+
+    test("specialist role agents should have write=true, edit=true", () => {
+      const specialistConfig = getToolConfigForRole("specialist")
+      expect(specialistConfig.write).toBe(true)
+      expect(specialistConfig.edit).toBe(true)
+    })
+
+    test("manager role agents should have write=true, edit=true", () => {
+      const managerConfig = getToolConfigForRole("manager")
+      expect(managerConfig.write).toBe(true)
+      expect(managerConfig.edit).toBe(true)
+    })
+
+    test("team-lead role agents should have write=true, edit=true", () => {
+      const teamLeadConfig = getToolConfigForRole("team-lead")
+      expect(teamLeadConfig.write).toBe(true)
+      expect(teamLeadConfig.edit).toBe(true)
+    })
+  })
+
+  describe("Specific Agent Tool Restrictions", () => {
+    test("explore agent should NOT have write/edit access", () => {
+      const role = AGENT_ROLE_REGISTRY["explore"]
+      expect(role).toBe("utility")
+      const config = getToolConfigForRole(role)
+      expect(config.write).toBe(false)
+      expect(config.edit).toBe(false)
+    })
+
+    test("librarian agent should NOT have write/edit access", () => {
+      const role = AGENT_ROLE_REGISTRY["librarian"]
+      expect(role).toBe("utility")
+      const config = getToolConfigForRole(role)
+      expect(config.write).toBe(false)
+      expect(config.edit).toBe(false)
+    })
+
+    test("oracle agent should NOT have write/edit access", () => {
+      const role = AGENT_ROLE_REGISTRY["oracle"]
+      expect(role).toBe("advisor")
+      const config = getToolConfigForRole(role)
+      expect(config.write).toBe(false)
+      expect(config.edit).toBe(false)
+    })
+
+    test("backend-typescript agent should have write/edit access", () => {
+      const role = AGENT_ROLE_REGISTRY["backend-typescript"]
+      expect(role).toBe("specialist")
+      const config = getToolConfigForRole(role)
+      expect(config.write).toBe(true)
+      expect(config.edit).toBe(true)
+    })
+
+    test("implementation-specialist agent should have write/edit access", () => {
+      const role = AGENT_ROLE_REGISTRY["implementation-specialist"]
+      expect(role).toBe("manager")
+      const config = getToolConfigForRole(role)
+      expect(config.write).toBe(true)
+      expect(config.edit).toBe(true)
+    })
+  })
+
+  describe("Regression Guards", () => {
+    test("getToolConfigForRole should be exported and callable", () => {
+      expect(getToolConfigForRole).toBeDefined()
+      expect(typeof getToolConfigForRole).toBe("function")
+    })
+
+    test("tool config should always include write and edit fields for all roles", () => {
+      const roles = ["team-lead", "manager", "specialist", "advisor", "utility"] as const
+      for (const role of roles) {
+        const config = getToolConfigForRole(role)
+        expect(config).toHaveProperty("write")
+        expect(config).toHaveProperty("edit")
+        expect(typeof config.write).toBe("boolean")
+        expect(typeof config.edit).toBe("boolean")
+      }
+    })
+
+    test("read-only roles (utility, advisor) should consistently deny write/edit", () => {
+      const readOnlyRoles = ["utility", "advisor"] as const
+      for (const role of readOnlyRoles) {
+        const config = getToolConfigForRole(role)
+        expect(config.write).toBe(false)
+        expect(config.edit).toBe(false)
+      }
+    })
+
+    test("file-modifying roles (team-lead, manager, specialist) should consistently allow write/edit", () => {
+      const fileModifyingRoles = ["team-lead", "manager", "specialist"] as const
+      for (const role of fileModifyingRoles) {
+        const config = getToolConfigForRole(role)
+        expect(config.write).toBe(true)
+        expect(config.edit).toBe(true)
+      }
+    })
+
+    test("all agents in registry should have valid roles", () => {
+      const validRoles = ["team-lead", "manager", "specialist", "advisor", "utility"]
+      for (const [agentName, role] of Object.entries(AGENT_ROLE_REGISTRY)) {
+        expect(validRoles).toContain(role)
+      }
+    })
+  })
+
+  describe("BackgroundManager Launch Integration", () => {
+    test("should correctly compute tool config for known utility agent (explore)", () => {
+      const agent = "explore"
+      const agentRole = AGENT_ROLE_REGISTRY[agent] ?? "specialist"
+      const toolConfig = getToolConfigForRole(agentRole)
+
+      expect(agentRole).toBe("utility")
+      expect(toolConfig.write).toBe(false)
+      expect(toolConfig.edit).toBe(false)
+    })
+
+    test("should correctly compute tool config for known specialist agent (backend-typescript)", () => {
+      const agent = "backend-typescript"
+      const agentRole = AGENT_ROLE_REGISTRY[agent] ?? "specialist"
+      const toolConfig = getToolConfigForRole(agentRole)
+
+      expect(agentRole).toBe("specialist")
+      expect(toolConfig.write).toBe(true)
+      expect(toolConfig.edit).toBe(true)
+    })
+
+    test("should correctly compute tool config for unknown agent (defaults to specialist)", () => {
+      const agent = "custom-unknown-agent"
+      const agentRole = AGENT_ROLE_REGISTRY[agent] ?? "specialist"
+      const toolConfig = getToolConfigForRole(agentRole)
+
+      expect(agentRole).toBe("specialist")
+      expect(toolConfig.write).toBe(true)
+      expect(toolConfig.edit).toBe(true)
+    })
+
+    test("nullish coalescing should preserve false values (critical for read-only enforcement)", () => {
+      const specialistConfig = getToolConfigForRole("specialist")
+      const utilityConfig = getToolConfigForRole("utility")
+
+      const specialistWrite = specialistConfig.write ?? true
+      expect(specialistWrite).toBe(true)
+
+      const utilityWrite = utilityConfig.write ?? true
+      expect(utilityWrite).toBe(false)
+    })
   })
 })
