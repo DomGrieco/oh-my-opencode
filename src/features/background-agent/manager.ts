@@ -8,6 +8,8 @@ import type {
 import { log } from "../../shared/logger"
 import { ConcurrencyManager } from "./concurrency"
 import type { BackgroundTaskConfig } from "../../config/schema"
+import { getToolConfigForRole } from "../../config/tool-config"
+import { AGENT_ROLE_REGISTRY } from "../../agents"
 import {
   findNearestMessageWithFields,
   MESSAGE_STORAGE,
@@ -124,6 +126,11 @@ export class BackgroundManager {
 
     log("[background-agent] Launching task:", { taskId: task.id, sessionID, agent: input.agent })
 
+    const agentRole = AGENT_ROLE_REGISTRY[input.agent] ?? "specialist"
+    const toolConfig = getToolConfigForRole(agentRole)
+    
+    log(`[background-agent] Applying role-based config for ${input.agent} (role: ${agentRole})`)
+
     this.client.session.promptAsync({
       path: { id: sessionID },
       body: {
@@ -132,6 +139,8 @@ export class BackgroundManager {
           task: false,
           background_task: false,
           call_omo_agent: false,
+          write: toolConfig.write ?? true,
+          edit: toolConfig.edit ?? true,
         },
         parts: [{ type: "text", text: input.prompt }],
       },
