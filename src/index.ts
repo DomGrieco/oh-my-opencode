@@ -31,6 +31,11 @@ import {
   createWorkflowStateEnforcerHook,
   createMetaLearningExtractorHook,
   createReadBeforeWriteHook,
+  createEmptyMessageSanitizerHook,
+  createThinkingBlockValidatorHook,
+  createPreemptiveCompactionHook,
+  createCompactionContextInjector,
+  createEditErrorRecoveryHook,
 } from "./hooks";
 import { createGoogleAntigravityAuthPlugin } from "./auth/antigravity";
 import {
@@ -80,7 +85,7 @@ import {
 import { BackgroundManager } from "./features/background-agent";
 import { createBuiltinMcps } from "./mcp";
 import { OhMyOpenCodeConfigSchema, type OhMyOpenCodeConfig, type HookName } from "./config";
-import { log, deepMerge } from "./shared";
+import { log, deepMerge, migrateAgentConfig } from "./shared";
 import { MaxTurnsEnforcer } from "./features/orchestration";
 import * as fs from "fs";
 import * as path from "path";
@@ -102,6 +107,7 @@ function getUserConfigDir(): string {
 
 const AGENT_NAME_MAP: Record<string, string> = {
   omo: "OmO",
+  sisyphus: "Sisyphus",
   build: "build",
   oracle: "oracle",
   librarian: "librarian",
@@ -128,6 +134,13 @@ function loadConfigFromPath(configPath: string): OhMyOpenCodeConfig | null {
 
       if (rawConfig.agents && typeof rawConfig.agents === "object") {
         rawConfig.agents = normalizeAgentNames(rawConfig.agents);
+        
+        // Migrate agent configs for OpenCode 1.1.1+ permission system compatibility
+        for (const [name, agentConfig] of Object.entries(rawConfig.agents)) {
+          if (agentConfig && typeof agentConfig === "object") {
+            rawConfig.agents[name] = migrateAgentConfig(agentConfig as Record<string, unknown>);
+          }
+        }
       }
 
       const result = OhMyOpenCodeConfigSchema.safeParse(rawConfig);
@@ -362,6 +375,26 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
     ? createReadBeforeWriteHook(ctx, pluginConfig.governance?.read_before_write)
     : null;
 
+  // LIF-111 Phase 4: Upstream hooks
+  const emptyMessageSanitizer = isHookEnabled("empty-message-sanitizer")
+    ? createEmptyMessageSanitizerHook()
+    : null;
+  const thinkingBlockValidator = isHookEnabled("thinking-block-validator")
+    ? createThinkingBlockValidatorHook()
+    : null;
+  const compactionContextInjector = isHookEnabled("compaction-context-injector")
+    ? createCompactionContextInjector()
+    : null;
+  const preemptiveCompaction = isHookEnabled("preemptive-compaction")
+    ? createPreemptiveCompactionHook(ctx, {
+        experimental: pluginConfig.experimental,
+        onBeforeSummarize: compactionContextInjector ?? undefined,
+      })
+    : null;
+  const editErrorRecovery = isHookEnabled("edit-error-recovery")
+    ? createEditErrorRecoveryHook(ctx)
+    : null;
+
   updateTerminalTitle({ sessionId: "main" });
 
   const backgroundManager = new BackgroundManager(ctx);
@@ -428,10 +461,13 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
     "chat.message": async (input, output) => {
       await claudeCodeHooks["chat.message"]?.(input, output);
       await keywordDetector?.["chat.message"]?.(input, output);
-      // Governance: Linear context injection
       await governanceLinearInjector?.["chat.message"]?.(input, output);
-      // LIF-72: Workflow state enforcement
       await workflowStateEnforcer?.["chat.message"]?.(input, output);
+    },
+
+    "experimental.chat.messages.transform": async (input, output) => {
+      await emptyMessageSanitizer?.["experimental.chat.messages.transform"]?.(input, output);
+      await thinkingBlockValidator?.["experimental.chat.messages.transform"]?.(input, output);
     },
 
     config: async (config) => {
@@ -445,26 +481,33 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
       const projectAgents = (pluginConfig.claude_code?.agents ?? true) ? loadProjectAgents(ctx.directory) : {};
 
       const isOmoEnabled = pluginConfig.omo_agent?.disabled !== true;
+      const isSisyphusEnabled = pluginConfig.sisyphus_agent?.disabled !== true;
+      const primaryOrchestrator = pluginConfig.primary_orchestrator ?? "OmO";
 
-      if (isOmoEnabled && builtinAgents.OmO) {
-        // TODO: When OpenCode releases `default_agent` config option (PR #5313),
-        // use `config.default_agent = "OmO"` instead of demoting build/plan.
-        // Tracking: https://github.com/sst/opencode/pull/5313
+      const hasPrimaryOrchestrator = 
+        (primaryOrchestrator === "OmO" && isOmoEnabled && builtinAgents.OmO) ||
+        (primaryOrchestrator === "Sisyphus" && isSisyphusEnabled && builtinAgents.Sisyphus);
+
+      if (hasPrimaryOrchestrator) {
+        const primaryAgent = primaryOrchestrator === "Sisyphus" ? builtinAgents.Sisyphus : builtinAgents.OmO;
+        const primaryAgentName = primaryOrchestrator;
+        const planAgentName = primaryOrchestrator === "Sisyphus" ? "Planner-Sisyphus" : "OmO-Plan";
+
         const { name: _planName, ...planConfigWithoutName } = config.agent?.plan ?? {};
-        const omoPlanOverride = pluginConfig.agents?.["OmO-Plan"];
-        const omoPlanBase = {
-          ...builtinAgents.OmO,
+        const planOverride = pluginConfig.agents?.[planAgentName];
+        const planBase = {
+          ...primaryAgent,
           ...planConfigWithoutName,
           description: `${config.agent?.plan?.description ?? "Plan agent"} (OhMyOpenCode version)`,
           color: config.agent?.plan?.color ?? "#6495ED",
         };
 
-        const omoPlanConfig = omoPlanOverride ? deepMerge(omoPlanBase, omoPlanOverride) : omoPlanBase;
+        const planConfig = planOverride ? deepMerge(planBase, planOverride) : planBase;
 
         config.agent = {
-          OmO: builtinAgents.OmO,
-          "OmO-Plan": omoPlanConfig,
-          ...Object.fromEntries(Object.entries(builtinAgents).filter(([k]) => k !== "OmO")),
+          [primaryAgentName]: primaryAgent,
+          [planAgentName]: planConfig,
+          ...Object.fromEntries(Object.entries(builtinAgents).filter(([k]) => k !== primaryAgentName)),
           ...userAgents,
           ...projectAgents,
           ...config.agent,
@@ -545,6 +588,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
       await rulesInjector?.event(input);
       await thinkMode?.event(input);
       await anthropicAutoCompact?.event(input);
+      await preemptiveCompaction?.event(input);
       await keywordDetector?.event(input);
       await agentUsageReminder?.event(input);
       await interactiveBashSession?.event(input);
@@ -722,6 +766,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
       await securityScanner?.["tool.execute.after"](input, output);
       await conflictDetector?.["tool.execute.after"](input, output);
       await governanceHistorian?.["tool.execute.after"](input, output);
+      await safeHookCall("edit-error-recovery", () => editErrorRecovery?.["tool.execute.after"](input, output));
 
       if (input.sessionID === getMainSessionID()) {
         updateTerminalTitle({

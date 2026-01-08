@@ -1,0 +1,23 @@
+{
+  "currentStep": "complete",
+  "completedSteps": [
+    "specify",
+    "plan",
+    "tasks",
+    "implement",
+    "review",
+    "test",
+    "complete"
+  ],
+  "artifactHashes": {
+    "spec.md": "8d45066b89bab292",
+    "plan.md": "2fdd73a3c950e265",
+    "tasks.md": "7ec45c2f72e1c8de",
+    "status.md": "a04972381bd55a5a"
+  },
+  "linearIssueId": null,
+  "linearStatus": "in_review",
+  "createdAt": "2026-01-02T21:39:50.138Z",
+  "updatedAt": "2026-01-07T03:16:33.612Z",
+  "lastCommand": "/complete"
+}

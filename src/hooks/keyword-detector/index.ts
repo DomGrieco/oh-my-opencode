@@ -1,6 +1,7 @@
 import { detectKeywords, extractPromptText } from "./detector"
 import { log } from "../../shared"
 import { injectHookMessage } from "../../features/hook-message-injector"
+import { getMainSessionID } from "../../features/claude-code-session-state"
 
 export * from "./detector"
 export * from "./constants"
@@ -23,6 +24,18 @@ export function createKeywordDetectorHook() {
       }
     ): Promise<void> => {
       if (injectedSessions.has(input.sessionID)) {
+        return
+      }
+
+      // Skip keyword injection for non-main sessions (subagent sessions)
+      // This prevents keywords like "ultrawork" from triggering in background tasks
+      const mainSessionID = getMainSessionID()
+      const isNonMainSession = mainSessionID && input.sessionID !== mainSessionID
+      if (isNonMainSession) {
+        log("Skipping keyword injection - non-main session", {
+          sessionID: input.sessionID,
+          mainSessionID,
+        })
         return
       }
 

@@ -9,16 +9,16 @@ The OhMyOpenCode (OMO) Agent System is a sophisticated multi-model orchestration
 
 ## Overview
 
-The system is built on a hierarchical structure where **OmO** (the primary agent) acts as the central intelligence and project manager. Complex implementation tasks are delegated through an **Implementation Specialist** (manager) to domain-specific specialists.
+The system is built on a hierarchical structure where **OmO** (the primary agent) acts as the central intelligence and project manager. OmO is built on the **Sisyphus** foundational orchestrator, extended with fork-specific capabilities. Complex implementation tasks are delegated through an **Implementation Specialist** (manager) to domain-specific specialists.
 
 ### Multi-Model Strategy
 
 By leveraging different models (Claude Opus/Sonnet, GPT-5.2, Gemini Pro, Grok-Code), the system matches the specific strengths of each model to the task at hand, balancing reasoning depth, speed, and cost.
 
-## Agent Hierarchy (LIF-62)
+## Agent Hierarchy
 
 ```
-OmO (team-lead, Claude Opus)
+OmO / Sisyphus (team-lead, Claude Opus)
 ├── implementation-specialist (manager, Claude Sonnet)
 │   │
 │   │   # Language/Platform Specialists
@@ -50,7 +50,7 @@ OmO (team-lead, Claude Opus)
 
 | Role | Can Delegate | Modifies Files | Governance | Examples |
 |------|--------------|----------------|------------|----------|
-| **team-lead** | Yes (to anyone) | Yes | Full | OmO |
+| **team-lead** | Yes (to anyone) | Yes | Full | OmO, Sisyphus |
 | **manager** | Yes (to specialists) | Yes | Full | implementation-specialist |
 | **specialist** | No (terminal) | Yes | Full | backend-typescript, frontend-react, etc. |
 | **advisor** | No | No | None | oracle |
@@ -60,7 +60,8 @@ OmO (team-lead, Claude Opus)
 
 | Agent | Model | Role | Governance | Key Restrictions |
 |-------|-------|------|------------|------------------|
-| **OmO** | `claude-opus-4-5` | team-lead | Full | None |
+| **OmO** | `claude-opus-4-5` | team-lead | Full | Primary orchestrator (Fork) |
+| **Sisyphus** | `claude-opus-4-5` | team-lead | Full | Foundation orchestrator (Upstream) |
 | **implementation-specialist** | `claude-sonnet-4-5` | manager | Full | Cannot call OmO |
 | **backend-typescript** | `claude-sonnet-4-5` | specialist | Full | Cannot delegate |
 | **backend-rust** | `claude-sonnet-4-5` | specialist | Full | Cannot delegate |
@@ -80,13 +81,62 @@ OmO (team-lead, Claude Opus)
 | **explore** | `grok-code` | utility | None | READ-ONLY |
 | **multimodal-looker** | `gemini-2.5-flash` | utility | None | READ-ONLY |
 
+## Primary Orchestrators
+
+The system features two primary orchestrators: **Sisyphus** (upstream foundation) and **OmO** (fork-specific extension). While OmO is the default, Sisyphus can be enabled as an experimental orchestrator for more structured workflows.
+
+### Sisyphus Architecture
+
+Sisyphus is the foundational orchestrator system, designed with a modular architecture that separates core orchestration logic from environment-specific extensions. It uses a builder pattern to construct dynamic system prompts.
+
+#### Builder Pattern (sisyphus-prompt-builder.ts)
+Prompt generation is handled by a dedicated builder that dynamically constructs the system prompt based on:
+- **Available Agents**: Lists subagents and their specific triggers/costs.
+- **Available Tools**: Categorizes tools (LSP, AST, Search) for appropriate selection.
+- **Available Skills**: Injects custom project/user skills into the orchestration logic.
+
+#### Operational Phases
+Sisyphus operates through a structured lifecycle:
+1. **Phase 0 - Intent Gate**: Classifies user requests (Trivial, Exploratory, Implementation, etc.) and checks for matching Skills or Key Triggers.
+2. **Phase 1 - Codebase Assessment**: Evaluates codebase maturity (Disciplined, Transitional, Legacy) to adapt behavior.
+3. **Phase 2A - Exploration**: Executes parallel search using Explore (internal) and Librarian (external) agents.
+4. **Phase 2B - Implementation**: Manages task execution with obsessive Todo tracking and 7-Section delegation prompts.
+5. **Phase 2C - Failure Recovery**: Implements a structured recovery flow for failed implementation attempts.
+6. **Phase 3 - Completion**: Verifies all deliverables with evidence (lsp_diagnostics, build/test) before finishing.
+
+#### Enabling Sisyphus
+To enable Sisyphus as the primary orchestrator, update the configuration in `oh-my-opencode.json`:
+
+```json
+{
+  "sisyphus_agent": {
+    "enabled": true
+  },
+  "primary_orchestrator": "Sisyphus"
+}
+```
+
+### OmO Migration & Fork Extensions
+
+OmO has been migrated to a "Sisyphus-base + Fork Extensions" architecture. It is now a thin wrapper that composes the core Sisyphus foundation with specialized extensions for this fork. The final OmO prompt is created by concatenating the Sisyphus base prompt with the composed fork extensions. This ensures that OmO benefits from all upstream Sisyphus improvements while maintaining fork-specific governance and workflow requirements.
+
+#### Fork Extensions (sisyphus-fork-extensions.ts)
+These extensions add unique capabilities to the orchestrator through specialized builder functions:
+- **buildGovernanceSection()**: Integrates Linear tools (`linear_branch`, `linear_update_status`) and enforces path validation rules for `src/`, `tests/`, and `docs/`.
+- **buildSpecWorkflowSection()**: Implements spec-driven task management, synchronizing OpenCode todos with `tasks.md` artifacts in spec folders (`context/specs/` or `.cursor/specs/`).
+- **buildLinearIntegrationSection()**: Handles Linear-specific workflows, including branch naming conventions and issue status transitions.
+- **buildIntentGateExtensions()**: Adds decision logic for automatic spec folder creation based on task complexity (e.g., required for work estimated >4h).
+- **buildDecisionMatrixExtensions()**: Expands the base decision matrix with fork-specific actions for Linear issues and Spec management.
+- **buildPlaybooksSection()**: Provides specialized, step-by-step guides for Bugfixes, Refactors, and Debugging.
+
+
 ## Multi-Layered Orchestration
 
 ### Delegation Flow
 
 ```mermaid
 flowchart TD
-    A[User Request] --> B[OmO]
+    A[User Request] --> B[OmO / Sisyphus]
     B --> C{Task Type?}
     C -->|Exploration| D[background_task explore]
     C -->|External Docs| E[background_task librarian]
@@ -129,15 +179,14 @@ To prevent context explosion and infinite loops:
 | **minimal** | Path validation, changelog only | (Reserved for future use) |
 | **none** | No governance injection | Read-only agents, OmO (already has governance) |
 
-### Governance Template
+### Governance Integration
 
-File-modifying agents receive a centralized governance template (~400 tokens) that includes:
+Governance is integrated through both automatic hooks and explicit tools available to the orchestrator:
 
-1. **Path Discipline**: File location conventions
-2. **Changelog Discipline**: Automatic modification tracking
-3. **Linear Integration**: Issue context and branch management
-4. **Spec-Driven Workflow**: Feature folder awareness
-5. **Structured Response Format**: JSON schema for handoffs
+1. **Path Discipline**: Enforced by `governance-path-validator` and documented in the orchestrator prompt.
+2. **Changelog Discipline**: Managed by `governance-historian`.
+3. **Linear Integration**: Issue context auto-injected by `governance-linear-injector`; managed via `linear_*` tools.
+4. **Spec-Driven Workflow**: Persistent planning tracked in `context/specs/` or `.cursor/specs/`.
 
 ### Governance Hooks
 
@@ -146,45 +195,7 @@ File-modifying agents receive a centralized governance template (~400 tokens) th
 | `governance-path-validator` | Before file write | Validates paths follow conventions |
 | `governance-historian` | After session | Creates changelog entries |
 | `governance-linear-injector` | On issue ID detection | Injects Linear context |
-
-## Primary Orchestrator: OmO
-
-OmO is the "Team Lead" of the system. Its behavior is governed by a complex system prompt that enforces strict operational discipline.
-
-### Intent Gate (Phase 0)
-
-Before any action, OmO classifies the user's intent:
-- **TRIVIAL**: Direct tool usage only
-- **EXPLORATION**: Assess search scope before firing agents
-- **IMPLEMENTATION**: Delegate to implementation-specialist
-- **ORCHESTRATION**: Break down into multi-step plans
-
-### Todo Management
-
-OmO is "obsessively" committed to task tracking:
-- **Mandatory Todos**: Any task with 2+ steps requires `todowrite`
-- **Atomic & Verifiable**: Each todo must be a single action with clear verification criteria
-- **Evidence-Based**: A task is only "completed" when evidence is provided
-
-### Blocking Gates
-
-Strict guardrails prevent common AI errors:
-- **Pre-Search**: Must try direct tools (grep/glob) before agents
-- **Pre-Edit**: Must read the file in the current session before editing
-- **Implementation Block**: Complex implementation MUST delegate to implementation-specialist
-- **Pre-Delegation**: Must use the **7-Section Prompt Structure**
-- **Pre-Completion**: All todos must be marked complete with evidence
-
-### 7-Section Prompt Structure
-
-All subagent delegations must follow this format:
-1. **TASK**: Specific, obsessive detail
-2. **EXPECTED OUTCOME**: Concrete deliverables
-3. **REQUIRED SKILLS**: Specific capabilities to invoke
-4. **REQUIRED TOOLS**: Explicit tool permissions
-5. **MUST DO**: Exhaustive requirements
-6. **MUST NOT DO**: Forbidden actions
-7. **CONTEXT**: File paths and constraints
+| `governance-docs-delegation` | Before doc write | Enforces delegation to document-writer |
 
 ## Implementation Specialist
 
@@ -221,18 +232,18 @@ The Implementation Specialist acts as a delegation hub between OmO and specializ
 ### Advisor Agents (Read-Only)
 
 #### Oracle (Strategic Advisor)
-The "Senior Engineering Advisor" used for high-level design, architecture reviews, and complex debugging. It has high reasoning effort but is restricted from modifying files.
+The "Senior Engineering Advisor" used for high-level design, architecture reviews, and complex debugging. It has high reasoning effort but is restricted from modifying files. Uses GPT-5.2 for deep analysis.
 
 ### Utility Agents (Read-Only)
 
 #### Explore (Contextual Grep)
-Optimized for internal codebase search. OmO fires multiple Explore agents in parallel to map out unknown architectures quickly.
+Optimized for internal codebase search. Sisyphus fires multiple Explore agents in parallel to map out unknown architectures quickly.
 
 #### Librarian (External Researcher)
-Specializes in external documentation, GitHub repository analysis, and open-source reference implementations.
+Specializes in external documentation, GitHub repository analysis, and open-source reference implementations. Provides evidence-based research for implementation details.
 
 #### Multimodal Looker (Media Analyst)
-Analyzes non-text files like PDFs, images, and diagrams.
+Analyzes non-text files like PDFs, images, and diagrams to extract relevant information without bloating the orchestrator's context.
 
 ### Language/Platform Specialists
 
@@ -262,7 +273,7 @@ Analyzes non-text files like PDFs, images, and diagrams.
 | test-specialist | Claude Sonnet | Unit/integration/e2e testing |
 | optimization-specialist | Claude Sonnet | Performance profiling |
 
-### Workflow Specialists (LIF-72)
+### Workflow Specialists
 
 | Specialist | Model | Domain |
 |------------|-------|--------|
@@ -272,37 +283,41 @@ Analyzes non-text files like PDFs, images, and diagrams.
 
 These specialists power the workflow commands (`/specify`, `/plan`, `/tasks`) and are invoked automatically when users run those commands.
 
-### Meta-Learning (LIF-73)
+### Meta-Learning
 
 | Specialist | Model | Domain |
 |------------|-------|--------|
 | context-learner | Claude Opus | Session analysis, pattern extraction |
 
-The context-learner analyzes session transcripts to extract insights for improving OmO orchestration, delegation patterns, and agent instructions.
+The context-learner analyzes session transcripts to extract insights for improving orchestration, delegation patterns, and agent instructions.
 
 ## Agent Infrastructure
 
-### Creation & Governance Injection
+### Creation & Prompt Building
 
-Agents are instantiated via `createBuiltinAgents()`. During creation:
-1. **Injects Environment Context**: OmO and librarian receive real-time info
-2. **Injects Governance Template**: File-modifying agents receive governance rules
-3. **Applies Overrides**: Configuration can be customized per-project
+Agents are instantiated via `createBuiltinAgents()`. For orchestrators (OmO/Sisyphus), the prompt is built dynamically:
+1. **Sisyphus Base**: Constructed via `buildDynamicSisyphusPrompt` using the available toolset and subagents.
+2. **Governance Injection**: Fork-specific extensions are appended to incorporate Linear and Spec workflows.
+3. **Environment Context**: Real-time info is injected into appropriate agents.
 
 ### Configuration Overrides
 
-Agents can be customized in `oh-my-opencode.json`:
+Agents and orchestrators can be customized in `oh-my-opencode.json`:
 
 ```json
 {
+  "omo_agent": {
+    "disabled": false
+  },
+  "sisyphus_agent": {
+    "enabled": true
+  },
+  "primary_orchestrator": "Sisyphus",
   "agents": {
     "overrides": {
       "oracle": {
-        "model": "openai/gpt-4o",
-        "temperature": 0.2
-      },
-      "explore": {
-        "disabled": true
+        "model": "openai/o1",
+        "temperature": 1.0
       }
     }
   }

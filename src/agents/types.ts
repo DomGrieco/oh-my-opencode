@@ -1,5 +1,31 @@
 import type { AgentConfig } from "@opencode-ai/sdk"
 
+export type AgentFactory = (model?: string) => AgentConfig
+
+export type AgentCategory = "exploration" | "specialist" | "advisor" | "utility"
+
+export type AgentCost = "FREE" | "CHEAP" | "EXPENSIVE"
+
+export interface DelegationTrigger {
+  domain: string
+  trigger: string
+}
+
+export interface AgentPromptMetadata {
+  category: AgentCategory
+  cost: AgentCost
+  triggers: DelegationTrigger[]
+  useWhen?: string[]
+  avoidWhen?: string[]
+  dedicatedSection?: string
+  promptAlias?: string
+  keyTrigger?: string
+}
+
+export function isGptModel(model: string): boolean {
+  return model.startsWith("openai/") || model.startsWith("github-copilot/gpt-")
+}
+
 /**
  * All built-in agent names.
  * 
@@ -7,6 +33,7 @@ import type { AgentConfig } from "@opencode-ai/sdk"
  */
 export type BuiltinAgentName =
   | "OmO"
+  | "Sisyphus"
   | "oracle"
   | "librarian"
   | "explore"
@@ -42,6 +69,8 @@ export type OverridableAgentName =
   | "build"
   | "plan"
   | "OmO-Plan"
+  | "OpenCode-Builder"
+  | "Planner-Sisyphus"
   | BuiltinAgentName
 
 export type AgentName = BuiltinAgentName
