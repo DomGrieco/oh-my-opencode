@@ -1,4 +1,10 @@
 import type { Plugin } from "@opencode-ai/plugin";
+import type { Message, Part } from "@opencode-ai/sdk";
+
+interface MessageWithParts {
+  info: Message;
+  parts: Part[];
+}
 import { createBuiltinAgents } from "./agents";
 import {
   createTodoContinuationEnforcer,
@@ -465,7 +471,10 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
       await workflowStateEnforcer?.["chat.message"]?.(input, output);
     },
 
-    "experimental.chat.messages.transform": async (input, output) => {
+    "experimental.chat.messages.transform": async (
+      input: Record<string, never>,
+      output: { messages: MessageWithParts[] }
+    ) => {
       await emptyMessageSanitizer?.["experimental.chat.messages.transform"]?.(input, output);
       await thinkingBlockValidator?.["experimental.chat.messages.transform"]?.(input, output);
     },
