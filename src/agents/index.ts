@@ -24,8 +24,10 @@ import { agentSpecialistAgent } from "./agent-specialist"
 import { securitySpecialistAgent } from "./security-specialist"
 import { testSpecialistAgent } from "./test-specialist"
 import { optimizationSpecialistAgent } from "./optimization-specialist"
-// Documentation specialists
+// LIF-71: Documentation specialists
 import { docsPublisherAgent } from "./docs-publisher"
+import { historianAgent } from "./historian"
+import { contextStewardAgent } from "./context-steward"
 // LIF-72: Workflow Specialists
 import { productStrategistAgent } from "./product-strategist"
 import { strategicPlannerAgent } from "./strategic-planner"
@@ -58,8 +60,10 @@ export const builtinAgents: Record<string, AgentConfig> = {
   "security-specialist": securitySpecialistAgent,
   "test-specialist": testSpecialistAgent,
   "optimization-specialist": optimizationSpecialistAgent,
-  // Documentation specialists
+  // LIF-71: Documentation specialists
   "docs-publisher": docsPublisherAgent,
+  historian: historianAgent,
+  "context-steward": contextStewardAgent,
   // LIF-72: Workflow Specialists
   "product-strategist": productStrategistAgent,
   "strategic-planner": strategicPlannerAgent,
@@ -105,8 +109,10 @@ export const AGENT_ROLE_REGISTRY: Record<string, AgentRole> = {
   "security-specialist": "specialist",
   "test-specialist": "specialist",
   "optimization-specialist": "specialist",
-  // Documentation specialists
+  // LIF-71: Documentation specialists
   "docs-publisher": "specialist",
+  historian: "specialist",
+  "context-steward": "specialist",
   // LIF-72: Workflow Specialists
   "product-strategist": "specialist",
   "strategic-planner": "specialist",
