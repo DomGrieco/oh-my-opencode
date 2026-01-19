@@ -1,0 +1,181 @@
+{
+  "version": 1,
+  "specPath": "context/specs/LIF-107-feat-lsp-setup-and-init-modernization",
+  "analysisSource": "analysis/analysis-2025-12-30.md",
+  "createdAt": "2025-12-30T17:15:00.000Z",
+  "updatedAt": "2025-12-30T17:20:00.000Z",
+  "round": 1,
+  "maxRounds": 2,
+  "changes": {
+    "CHG-001": {
+      "id": "CHG-001",
+      "findingId": "C1",
+      "targetFile": "plan.md",
+      "section": "Phase 5: LSP Validation",
+      "operation": "update",
+      "priority": "critical",
+      "description": "Changed lsp_check from separate directory to existing src/tools/lsp/tools.ts",
+      "status": "confirmed",
+      "appliedAt": "2025-12-30T17:15:30.000Z",
+      "validatedAt": "2025-12-30T17:18:00.000Z",
+      "validationResults": [
+        {"validator": "code-refs", "valid": true, "reason": "lsp_check follows existing pattern of 11 LSP tools in tools.ts"},
+        {"validator": "coherence", "valid": true, "reason": "Co-location pattern matches codebase conventions"},
+        {"validator": "conflicts", "valid": true, "reason": "No existing lsp_check tool found"}
+      ]
+    },
+    "CHG-002": {
+      "id": "CHG-002",
+      "findingId": "C2",
+      "targetFile": "plan.md",
+      "section": "Phase 3: Migrate init-project",
+      "operation": "update",
+      "priority": "critical",
+      "description": "Reduced time estimate from 3h to 2.5h (simpler Bun migration)",
+      "status": "confirmed",
+      "appliedAt": "2025-12-30T17:15:32.000Z",
+      "validatedAt": "2025-12-30T17:18:00.000Z",
+      "validationResults": [
+        {"validator": "code-refs", "valid": true, "reason": "Only 2 Node.js patterns to migrate"},
+        {"validator": "coherence", "valid": true, "reason": "Migration requirements correctly identified"}
+      ]
+    },
+    "CHG-003": {
+      "id": "CHG-003",
+      "findingId": "C3",
+      "targetFile": "plan.md",
+      "section": "Phase 7: First-Run Detection",
+      "operation": "update",
+      "priority": "critical",
+      "description": "Increased time from 1h to 2h for hook conflict resolution",
+      "status": "confirmed",
+      "appliedAt": "2025-12-30T17:15:34.000Z",
+      "validatedAt": "2025-12-30T17:18:00.000Z",
+      "validationResults": [
+        {"validator": "coherence", "valid": true, "reason": "3 existing session.created hooks identified"},
+        {"validator": "conflicts", "valid": true, "reason": "POTENTIAL CONFLICT noted but mitigation strategy is valid"}
+      ]
+    },
+    "CHG-004": {
+      "id": "CHG-004",
+      "findingId": "I1",
+      "targetFile": "plan.md",
+      "section": "Phase 1: LSP Documentation",
+      "operation": "add",
+      "priority": "major",
+      "description": "Added Task T1.0 to enhance BUILTIN_SERVERS with installation metadata",
+      "status": "confirmed",
+      "appliedAt": "2025-12-30T17:16:00.000Z",
+      "validatedAt": "2025-12-30T17:18:00.000Z",
+      "validationResults": [
+        {"validator": "code-refs", "valid": true, "reason": "BUILTIN_SERVERS exists with 22 servers, needs enhancement"},
+        {"validator": "coherence", "valid": true, "reason": "30min estimate is conservative and justified"}
+      ]
+    },
+    "CHG-005": {
+      "id": "CHG-005",
+      "findingId": "I2",
+      "targetFile": "plan.md",
+      "section": "Documentation Structure",
+      "operation": "update",
+      "priority": "major",
+      "description": "Changed docs location from docs/lsp/ to docs/guides/lsp/",
+      "status": "confirmed",
+      "appliedAt": "2025-12-30T17:16:05.000Z",
+      "validatedAt": "2025-12-30T17:18:00.000Z",
+      "validationResults": [
+        {"validator": "code-refs", "valid": true, "reason": "docs/guides/ exists with 3 files, matches pattern"},
+        {"validator": "coherence", "valid": true, "reason": "LSP setup is user guide, not architecture"},
+        {"validator": "conflicts", "valid": true, "reason": "NO CONFLICT - adding lsp/ subdirectory is safe"}
+      ]
+    },
+    "CHG-006": {
+      "id": "CHG-006",
+      "findingId": "I4",
+      "targetFile": "tasks.md",
+      "section": "Phase 8: Testing",
+      "operation": "add",
+      "priority": "major",
+      "description": "Added unit test tasks T8.0a-c for metrics, lsp_check, error hook",
+      "status": "confirmed",
+      "appliedAt": "2025-12-30T17:16:30.000Z",
+      "validatedAt": "2025-12-30T17:18:00.000Z",
+      "validationResults": [
+        {"validator": "coherence", "valid": true, "reason": "Unit tests follow project testing patterns"}
+      ]
+    },
+    "CHG-007": {
+      "id": "CHG-007",
+      "findingId": "summary",
+      "targetFile": "tasks.md",
+      "section": "Summary",
+      "operation": "update",
+      "priority": "minor",
+      "description": "Updated task count (73→79) and time estimate (19.5h→24.5h)",
+      "status": "confirmed",
+      "appliedAt": "2025-12-30T17:17:00.000Z",
+      "validatedAt": "2025-12-30T17:18:00.000Z",
+      "validationResults": [
+        {"validator": "coherence", "valid": true, "reason": "Arithmetic is correct, +25% buffer is prudent"}
+      ]
+    },
+    "CHG-008": {
+      "id": "CHG-008",
+      "findingId": "sync-check",
+      "targetFile": "spec.md",
+      "section": "Header",
+      "operation": "update",
+      "priority": "minor",
+      "description": "Updated status from 'Ready for Planning' to 'Ready for Implementation'",
+      "status": "confirmed",
+      "appliedAt": "2025-12-30T20:45:00.000Z",
+      "validatedAt": "2025-12-30T20:45:00.000Z",
+      "validationResults": [
+        {"validator": "coherence", "valid": true, "reason": "Status reflects completed planning phase"}
+      ]
+    },
+    "CHG-009": {
+      "id": "CHG-009",
+      "findingId": "sync-check",
+      "targetFile": "spec.md",
+      "section": "Out of Scope",
+      "operation": "update",
+      "priority": "minor",
+      "description": "Fixed LSP server count from 21 to 22 (consistency with rest of spec)",
+      "status": "confirmed",
+      "appliedAt": "2025-12-30T20:45:00.000Z",
+      "validatedAt": "2025-12-30T20:45:00.000Z",
+      "validationResults": [
+        {"validator": "coherence", "valid": true, "reason": "Matches line 15, 61, 129, 183 which all say 22"}
+      ]
+    }
+  },
+  "summary": {
+    "total": 9,
+    "applied": 9,
+    "confirmed": 9,
+    "flagged": 0,
+    "rejected": 0,
+    "skipped": 0
+  },
+  "validators": {
+    "code-refs": {
+      "taskId": "bg_888cf955",
+      "status": "completed",
+      "duration": "45s",
+      "result": "ALL PASS"
+    },
+    "coherence": {
+      "taskId": "bg_ad5327ac",
+      "status": "completed",
+      "duration": "1m 24s",
+      "result": "ALL PASS - 5/5 changes valid and coherent"
+    },
+    "conflicts": {
+      "taskId": "bg_7c998242",
+      "status": "completed",
+      "duration": "1m 17s",
+      "result": "0 blocking conflicts, 1 potential (with mitigation)"
+    }
+  }
+}
