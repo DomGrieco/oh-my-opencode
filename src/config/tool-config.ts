@@ -29,10 +29,10 @@ export const TOOL_CONFIG_BY_ROLE: Record<AgentRole, Record<string, boolean>> = {
   },
 
   manager: {
-    // Can delegate DOWN but not UP
-    task: true,              // ✅ CAN delegate to specialists
+    // Can delegate DOWN to specialists (loop prevention via DelegationTracker)
+    task: true,              // ✅ Native OpenCode delegation
     background_task: true,   // ✅ CAN run background tasks
-    call_omo_agent: false,   // ❌ Cannot call back to OmO (prevents loops)
+    call_omo_agent: true,    // ✅ CAN delegate to oh-my-opencode agents (DelegationTracker prevents loops)
     // File tools: enabled with governance
     write: true,
     edit: true,

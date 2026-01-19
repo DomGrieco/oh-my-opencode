@@ -1,0 +1,20 @@
+{
+  "currentStep": "review",
+  "completedSteps": [
+    "specify",
+    "plan",
+    "tasks",
+    "review"
+  ],
+  "artifactHashes": {
+    "spec.md": "14ca51e0b500f43c",
+    "plan.md": "c577114a84423909",
+    "tasks.md": "30e72bb13a389fcc",
+    "status.md": "dd6dc1ffc2635d35"
+  },
+  "linearIssueId": null,
+  "linearStatus": "in_progress",
+  "createdAt": "2025-12-30T07:02:40.125Z",
+  "updatedAt": "2026-01-04T02:46:58.793Z",
+  "lastCommand": "/review"
+}

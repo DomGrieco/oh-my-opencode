@@ -1,0 +1,12 @@
+# Archive Note
+
+## rule-engineer-legacy-2025-12-30.md
+
+Archived: 2026-01-03
+Reason: Replaced by LIF-110 Rule Keeper System (two-agent TypeScript implementation)
+
+New system location:
+- src/agents/rule-keeper.ts (orchestrator)
+- src/agents/rule-engineer.ts (specialist)
+
+See: .cursor/specs/LIF-110-feat-rule-keeper-agent/
