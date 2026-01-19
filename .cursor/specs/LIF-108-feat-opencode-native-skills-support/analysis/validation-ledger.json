@@ -1,0 +1,133 @@
+{
+  "version": 1,
+  "specPath": ".cursor/specs/LIF-108-feat-opencode-native-skills-support",
+  "analysisSource": ".cursor/specs/LIF-108-feat-opencode-native-skills-support/analysis/context-window-strategy.md",
+  "createdAt": "2025-12-30T01:58:00.000Z",
+  "updatedAt": "2025-12-30T02:45:00Z",
+  "round": 2,
+  "maxRounds": 2,
+  "changes": {
+    "CHG-001": {
+      "id": "CHG-001",
+      "targetFile": "spec.md",
+      "operation": "update",
+      "priority": "high",
+      "status": "confirmed",
+      "description": "Added FR-9 through FR-12 (context optimization requirements), US-6 and US-7 (agent experience), NFR-5 and NFR-6 (performance targets)",
+      "appliedAt": "2025-12-30T02:30:00Z",
+      "validatedAt": "2025-12-30T02:45:00Z",
+      "validationResults": [
+        {"validator": "code-references", "valid": true},
+        {"validator": "architectural-coherence", "valid": true}
+      ]
+    },
+    "CHG-002": {
+      "id": "CHG-002",
+      "targetFile": "plan.md",
+      "operation": "update",
+      "priority": "high",
+      "status": "confirmed",
+      "description": "Added two-tier loading architecture diagram and token budget analysis",
+      "appliedAt": "2025-12-30T02:32:00Z",
+      "validatedAt": "2025-12-30T02:45:00Z",
+      "validationResults": [
+        {"validator": "code-references", "valid": true},
+        {"validator": "architectural-coherence", "valid": true}
+      ]
+    },
+    "CHG-003": {
+      "id": "CHG-003",
+      "targetFile": "plan.md",
+      "operation": "update",
+      "priority": "high",
+      "status": "confirmed",
+      "description": "Added shared discovery layer (src/shared/skill-discovery.ts) with SkillCache singleton",
+      "appliedAt": "2025-12-30T02:34:00Z",
+      "validatedAt": "2025-12-30T02:45:00Z",
+      "validationResults": [
+        {"validator": "code-references", "valid": true},
+        {"validator": "architectural-coherence", "valid": true}
+      ]
+    },
+    "CHG-004": {
+      "id": "CHG-004",
+      "targetFile": "plan.md",
+      "operation": "update",
+      "priority": "high",
+      "status": "confirmed",
+      "description": "Added caching strategy with directory-level mtime invalidation",
+      "appliedAt": "2025-12-30T02:36:00Z",
+      "validatedAt": "2025-12-30T02:45:00Z",
+      "validationResults": [
+        {"validator": "code-references", "valid": true},
+        {"validator": "architectural-coherence", "valid": true, "notes": "Changed from per-skill to directory-level mtime for NFR-6 compliance"}
+      ]
+    },
+    "CHG-005": {
+      "id": "CHG-005",
+      "targetFile": "tasks.md",
+      "operation": "update",
+      "priority": "high",
+      "status": "confirmed",
+      "description": "Added Phase 0 (shared discovery), Phase 5 (context-optimized tool), Phase 6 (cache integration). Renumbered all task IDs to avoid collisions.",
+      "appliedAt": "2025-12-30T02:38:00Z",
+      "validatedAt": "2025-12-30T02:45:00Z",
+      "validationResults": [
+        {"validator": "code-references", "valid": true},
+        {"validator": "architectural-coherence", "valid": true}
+      ]
+    },
+    "CHG-006": {
+      "id": "CHG-006",
+      "targetFile": "spec.md",
+      "operation": "update",
+      "priority": "medium",
+      "status": "confirmed",
+      "description": "Updated In Scope to include context-optimized loading, shared discovery layer, caching, and enhanced discovery",
+      "appliedAt": "2025-12-30T02:40:00Z",
+      "validatedAt": "2025-12-30T02:45:00Z",
+      "validationResults": [
+        {"validator": "code-references", "valid": true},
+        {"validator": "architectural-coherence", "valid": true}
+      ]
+    },
+    "CHG-007": {
+      "id": "CHG-007",
+      "targetFile": "plan.md",
+      "operation": "update",
+      "priority": "medium",
+      "status": "confirmed",
+      "description": "Added SkillDirectory, SkillMetadata, SkillContent, and SkillCache data model definitions",
+      "appliedAt": "2025-12-30T02:42:00Z",
+      "validatedAt": "2025-12-30T02:45:00Z",
+      "validationResults": [
+        {"validator": "code-references", "valid": true},
+        {"validator": "architectural-coherence", "valid": true}
+      ]
+    }
+  },
+  "summary": {
+    "total": 7,
+    "applied": 7,
+    "confirmed": 7,
+    "flagged": 0,
+    "rejected": 0,
+    "skipped": 0
+  },
+  "validators": {
+    "code-references": {
+      "status": "passed",
+      "duration": "1m 5s",
+      "result": "All 7 files, 3 functions, and 2 types verified"
+    },
+    "architectural-coherence": {
+      "status": "passed",
+      "duration": "1m 9s",
+      "issues_resolved": [
+        "ISSUE-1: Task ID collision fixed by renumbering Phase 1-7 tasks",
+        "ISSUE-2: require('fs') changed to import syntax",
+        "ISSUE-3: Per-skill mtime changed to directory-level mtime for NFR-6 compliance"
+      ]
+    }
+  }
+}

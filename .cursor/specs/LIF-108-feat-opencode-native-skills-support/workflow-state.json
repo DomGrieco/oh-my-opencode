@@ -1,0 +1,20 @@
+{
+  "currentStep": "plan",
+  "completedSteps": [
+    "specify",
+    "plan",
+    "tasks",
+    "implement"
+  ],
+  "artifactHashes": {
+    "spec.md": "ab8558017df6fcab",
+    "plan.md": "b61d366fd51586af",
+    "tasks.md": "60d80cba49724bbe",
+    "status.md": "0e5846a0d9ebc121"
+  },
+  "linearIssueId": "LIF-108",
+  "linearStatus": "in_progress",
+  "createdAt": "2025-12-30T01:44:58.088Z",
+  "updatedAt": "2025-12-30T04:07:17.091Z",
+  "lastCommand": "/plan"
+}
