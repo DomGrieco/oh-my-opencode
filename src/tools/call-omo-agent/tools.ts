@@ -88,11 +88,36 @@ interface Message {
   parts?: ToolPart[]
 }
 
-/**
- * Check if a session has running/pending tools or is actively generating.
- * Returns true if session is still working.
- */
-async function hasRunningTools(ctx: PluginInput, sessionID: string): Promise<boolean> {
+async function isSessionStillRunning(ctx: PluginInput, sessionID: string): Promise<boolean> {
+  try {
+    const statusResult = await ctx.client.session.status()
+    if (statusResult.error || !statusResult.data) {
+      log(`[call_omo_agent] Failed to get session status, assuming still running`)
+      return true
+    }
+    
+    const allStatuses = statusResult.data as Record<string, { type: string }>
+    const sessionStatus = allStatuses[sessionID]
+    
+    if (!sessionStatus) {
+      log(`[call_omo_agent] Session ${sessionID} not found in status, checking messages`)
+      return await hasRunningToolsLegacy(ctx, sessionID)
+    }
+    
+    if (sessionStatus.type === "idle") {
+      log(`[call_omo_agent] Session ${sessionID} is idle (complete)`)
+      return false
+    }
+    
+    log(`[call_omo_agent] Session ${sessionID} status: ${sessionStatus.type} (still running)`)
+    return true
+  } catch (error) {
+    log(`[call_omo_agent] isSessionStillRunning error for ${sessionID}:`, error)
+    return true
+  }
+}
+
+async function hasRunningToolsLegacy(ctx: PluginInput, sessionID: string): Promise<boolean> {
   try {
     const messagesResult = await ctx.client.session.messages({ path: { id: sessionID } })
     if (messagesResult.error || !messagesResult.data) return false
@@ -100,7 +125,6 @@ async function hasRunningTools(ctx: PluginInput, sessionID: string): Promise<boo
     const messages = messagesResult.data as Message[]
     if (messages.length === 0) return false
     
-    // Check 1: Any tool with status "pending" or "running"
     for (const message of messages) {
       for (const part of message.parts ?? []) {
         if (part.type === "tool" && part.state?.status) {
@@ -112,31 +136,19 @@ async function hasRunningTools(ctx: PluginInput, sessionID: string): Promise<boo
       }
     }
     
-    // Check 2: If last message is USER, session is working (waiting for assistant response)
     const lastMessage = messages[messages.length - 1]
     if (lastMessage?.info?.role === "user") {
       log(`[call_omo_agent] Session ${sessionID} last message is USER - still working`)
       return true
     }
     
-    // Check 3: Last assistant message still being generated (no time.completed)
-    const lastAssistant = messages.filter(m => m.info?.role === "assistant").pop()
-    if (lastAssistant && !lastAssistant.info?.time?.completed) {
-      log(`[call_omo_agent] Session ${sessionID} assistant message not completed`)
-      return true
-    }
-    
     return false
   } catch (error) {
-    log(`[call_omo_agent] hasRunningTools error for ${sessionID}:`, error)
+    log(`[call_omo_agent] hasRunningToolsLegacy error for ${sessionID}:`, error)
     return false
   }
 }
 
-/**
- * Recursively check if a session or any of its descendants have running work.
- * This handles nested child sessions (grandchildren, etc.)
- */
 async function hasRunningDescendants(
   ctx: PluginInput,
   sessionID: string,
@@ -148,8 +160,7 @@ async function hasRunningDescendants(
     return false
   }
   
-  // Check this session's tools first
-  if (await hasRunningTools(ctx, sessionID)) {
+  if (await isSessionStillRunning(ctx, sessionID)) {
     return true
   }
   

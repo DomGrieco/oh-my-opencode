@@ -2,10 +2,19 @@ import { tool } from "@opencode-ai/plugin"
 import { existsSync, readdirSync, readFileSync } from "fs"
 import { homedir } from "os"
 import { join, basename, dirname } from "path"
+import { execSync } from "child_process"
 import { parseFrontmatter, resolveCommandsInText, resolveFileReferencesInText, sanitizeModelField } from "../../shared"
 import { commandPreflight, formatPreflightResult, type PreflightResult } from "../../shared/command-preflight"
 import { isMarkdownFile } from "../../shared/file-utils"
 import type { CommandScope, CommandMetadata, CommandInfo, CommandCategory } from "./types"
+
+function getCurrentGitBranch(): string | undefined {
+  try {
+    return execSync("git branch --show-current", { encoding: "utf-8", stdio: ["pipe", "pipe", "pipe"] }).trim() || undefined
+  } catch {
+    return undefined
+  }
+}
 
 function discoverCommandsFromDir(commandsDir: string, scope: CommandScope): CommandInfo[] {
   if (!existsSync(commandsDir)) {
@@ -108,6 +117,7 @@ async function formatLoadedCommand(cmd: CommandInfo): Promise<FormatCommandResul
       command: cmd.metadata.step,
       requiredArtifacts: cmd.metadata.requires,
       createSpecFolder: cmd.metadata.step === "specify",
+      branch: getCurrentGitBranch(),
     })
 
     if (preflight.status === "blocked") {
