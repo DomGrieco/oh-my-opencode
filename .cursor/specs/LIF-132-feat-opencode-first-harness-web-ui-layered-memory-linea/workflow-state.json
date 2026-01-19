@@ -1,0 +1,15 @@
+{
+  "currentStep": "specify",
+  "completedSteps": [],
+  "artifactHashes": {
+    "spec.md": "3b93666bf8aac088",
+    "plan.md": "8776276e6ed58e6f",
+    "tasks.md": "46e8626c47af5107",
+    "status.md": "836beb55427217ac"
+  },
+  "linearIssueId": null,
+  "linearStatus": null,
+  "createdAt": "2026-01-18T04:27:46.811Z",
+  "updatedAt": "2026-01-18T04:27:46.811Z",
+  "lastCommand": "/specify"
+}
